@@ -39,6 +39,7 @@ class Sconto:
     validita: str
     iva_sconto: str
     condizione_applicazione: str
+    durata_mesi: int = 0
     prezzi: List[IntervalloPrezzo] = field(default_factory=list)
 
 
@@ -64,6 +65,7 @@ class Offerta:
     modalita_pagamento: str
     tipo_dispacciamento: str
     nome_dispacciamento: str
+    regioni: List[str] = field(default_factory=list)
     tipologie_att_contr: List[str] = field(default_factory=list)
     componenti: List[ComponenteImpresa] = field(default_factory=list)
     condizioni: List[CondizioneContrattuale] = field(default_factory=list)
@@ -106,6 +108,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                     "componenti": [],
                     "condizioni": [],
                     "sconti": [],
+                    "regioni": [],
                     "tipologie_att_contr": [],
                 }
             elif tag == "ComponenteImpresa":
@@ -117,6 +120,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
             elif tag == "Sconto":
                 current_sconto = {
                     "prezzi": [],
+                    "durata_mesi": 0,
                 }
 
         elif event == "end":
@@ -145,6 +149,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                     componenti=current_offerta.get("componenti", []),
                     condizioni=current_offerta.get("condizioni", []),
                     sconti=current_offerta.get("sconti", []),
+                    regioni=current_offerta.get("regioni", []),
                     tipologie_att_contr=current_offerta.get("tipologie_att_contr", []),
                 ))
                 elem.clear()
@@ -180,6 +185,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                         validita=current_sconto.get("validita", ""),
                         iva_sconto=current_sconto.get("iva_sconto", ""),
                         condizione_applicazione=current_sconto.get("condizione_applicazione", ""),
+                        durata_mesi=current_sconto.get("durata_mesi", 0),
                         prezzi=current_sconto.get("prezzi", []),
                     ))
                 current_sconto = None
@@ -192,6 +198,8 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                     current_sconto["descrizione"] = elem.text.strip() if elem.text else ""
                 elif tag == "VALIDITA":
                     current_sconto["validita"] = elem.text.strip() if elem.text else ""
+                elif tag == "DURATA" and current_sconto is not None:
+                    current_sconto["durata_mesi"] = int(elem.text.strip()) if elem.text and elem.text.strip().isdigit() else 0
                 elif tag == "IVA_SCONTO":
                     current_sconto["iva_sconto"] = elem.text.strip() if elem.text else ""
                 elif tag == "CONDIZIONE_APPLICAZIONE":
@@ -261,6 +269,15 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                         current_offerta["tipologie_att_contr"].append(decoded)
                 elif tag == "NOME" and current_componente is None:
                     current_offerta["nome_dispacciamento"] = elem.text.strip() if elem.text else ""
+                elif tag == "REGIONE":
+                    codice = elem.text.strip() if elem.text else ""
+                    if codice:
+                        current_offerta["regioni"].append(codice)
+                elif tag == "PROVINCIA":
+                    codice = elem.text.strip() if elem.text else ""
+                    if codice:
+                        # Segna con prefisso P_ per distinguerle dalle regioni
+                        current_offerta["regioni"].append(f"P_{codice}")
 
             # Estrazione campi ComponenteImpresa
             elif current_componente is not None:

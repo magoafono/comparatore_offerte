@@ -133,6 +133,14 @@ Esempi:
     parser.add_argument("--tipo-attivazione", default="tutte",
                         choices=["tutte", "nuova", "cambio", "voltura", "subentro"],
                         help="Tipo di attivazione (default: tutte)")
+    parser.add_argument("--confronta", action="store_true",
+                        help="Confronta con la mia offerta attuale da data/my_offer.json")
+    parser.add_argument("--max", type=int, default=50,
+                        help="Numero massimo di offerte da mostrare (default: 50)")
+    parser.add_argument("--ignora-sconti-promo", action="store_true",
+                        help="Ignora sconti promozionali (validità limitata) nel calcolo annuale")
+    parser.add_argument("--zona", type=str, default="",
+                        help="Filtra per zona geografica (codice ISTAT o nome, es. 02/'valle d'aosta').")
     return parser
 
 
@@ -159,6 +167,10 @@ def parse_args() -> Dict[str, Any]:
         "csv_path": args.csv_path,
         "confronto_portale": args.confronto_portale,
         "tipo_attivazione": args.tipo_attivazione,
+        "confronta": args.confronta,
+        "max": args.max,
+        "ignora_sconti_promo": args.ignora_sconti_promo,
+        "zona": args.zona,
     }
 
     # Se mancano dati essenziali, entra in modalità interattiva

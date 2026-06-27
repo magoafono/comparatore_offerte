@@ -1,7 +1,9 @@
 """Configurazione e costanti del comparatore offerte."""
 
+import json
 import os
 from pathlib import Path
+from typing import Optional, Dict, Any
 
 # Directory base
 BASE_DIR = Path(__file__).parent.resolve()
@@ -60,6 +62,30 @@ MAPPING = {
     },
 }
 
+# Codici ISTAT regioni (da ZoneOfferta/REGIONE nell'XML)
+REGIONI_MAP = {
+    "01": "piemonte",
+    "02": "valle d'aosta",
+    "03": "lombardia",
+    "04": "trentino-alto adige",
+    "05": "veneto",
+    "06": "friuli-venezia giulia",
+    "07": "liguria",
+    "08": "emilia-romagna",
+    "09": "toscana",
+    "10": "umbria",
+    "11": "marche",
+    "12": "lazio",
+    "13": "abruzzo",
+    "14": "molise",
+    "15": "campania",
+    "16": "puglia",
+    "17": "basilicata",
+    "18": "calabria",
+    "19": "sicilia",
+    "20": "sardegna",
+}
+
 # Profili di consumo standard (percentuali per fascia)
 # "tutte" = nessun filtro, profilo monoraria per il calcolo
 PROFILO_CONSUMO = {
@@ -95,6 +121,15 @@ BLACKLIST_CONDIZIONI_DEFAULT = [
     "recesso anticipato",
     "indennizzo",
     "spese di disattivazione",
+    "valle d'aosta",
+    "alto adige",
+    "maggior tutela",
+    "polizza rca",
+    "smart tv",
+    "b-bike",
+    "universo casa",
+    "tim energia",
+    "bozza",
 ]
 
 # Parametri di sistema per profilo: pattern di ricerca nel CSV parametri
@@ -114,3 +149,35 @@ PROFILI_PARAMETRI = {
         "escludi": [],
     },
 }
+
+# --- Mia offerta (confronto) ---
+MY_OFFER_STUB_PATH = DATA_DIR / "my_offer_stub.json"
+MY_OFFER_PATH = DATA_DIR / "my_offer.json"
+
+# Campi obbligatori per my_offer.json
+MY_OFFER_REQUIRED = {"venditore", "nome_offerta", "tipo", "tariffa", "prezzo_energia", "quota_fissa"}
+
+def carica_mia_offerta() -> Optional[Dict[str, Any]]:
+    """Carica la mia offerta da my_offer.json. Ritorna None se non esiste."""
+    if not MY_OFFER_PATH.exists():
+        if MY_OFFER_STUB_PATH.exists():
+            print(f"⚠️  Crea data/my_offer.json copiando da data/my_offer_stub.json e inserisci i tuoi dati.")
+        return None
+    try:
+        with open(MY_OFFER_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Filtra chiavi _note
+        data = {k: v for k, v in data.items() if not k.startswith("_")}
+        # Verifica campi obbligatori
+        mancanti = MY_OFFER_REQUIRED - set(data.keys())
+        if mancanti:
+            print(f"⚠️  my_offer.json: campi mancanti: {', '.join(sorted(mancanti))}")
+            print(f"   Usa data/my_offer_stub.json come modello.")
+            return None
+        # Default per opzionali
+        data.setdefault("quota_potenza", 0.0)
+        data.setdefault("sconti", 0.0)
+        return data
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"⚠️  Errore lettura my_offer.json: {e}")
+        return None

@@ -13,6 +13,7 @@ def calcola_spesa_annua(
     pun: float,
     residente: bool,
     confronto_portale: bool = False,
+    ignora_sconti_promo: bool = False,
 ) -> Dict[str, float]:
     """
     Calcola la spesa annua stimata per un'offerta.
@@ -55,12 +56,16 @@ def calcola_spesa_annua(
     sconti_totali = 0.0
     for sc in offerta.sconti:
         # Applica solo sconti automatici (CONDIZIONE_APPLICAZIONE=00 -> nessuna condizione)
-        if sc.condizione_applicazione == "00":
-            for p in sc.prezzi:
-                if p.unita_misura == "euro_anno":
-                    sconti_totali += p.prezzo
-                elif p.unita_misura == "euro_kwh":
-                    sconti_totali += p.prezzo * consumo_annuo
+        if sc.condizione_applicazione != "00":
+            continue
+        # Se richiesto, ignora sconti promozionali (VALIDITA=02 -> validità limitata)
+        if ignora_sconti_promo and sc.validita == "02":
+            continue
+        for p in sc.prezzi:
+            if p.unita_misura == "euro_anno":
+                sconti_totali += p.prezzo
+            elif p.unita_misura == "euro_kwh":
+                sconti_totali += p.prezzo * consumo_annuo
     spesa_venditore = max(0.0, spesa_venditore - sconti_totali)
 
     # --- 3. Oneri di sistema ---
@@ -167,6 +172,102 @@ def _calcola_oneri_sistema(parametri: Dict[str, float], potenza: float, resident
     # L'IVA è applicata sul totale. Per ora calcoliamo senza IVA e aggiungiamo una nota.
 
     return oneri_fissi, oneri_kwh
+
+
+def calcola_mia_offerta(
+    mia_offerta: dict,
+    parametri: Dict[str, float],
+    consumo_annuo: int,
+    potenza: float,
+    pun: float,
+    residente: bool,
+    confronto_portale: bool = False,
+    ignora_sconti_promo: bool = False,
+) -> Dict[str, float]:
+    """Calcola la spesa annua per la mia offerta attuale (da my_offer.json).
+
+    Riutilizza la stessa logica del calcolatore: componenti venditore + PUN + oneri sistema + IVA.
+    """
+    import copy
+    from dataclasses import dataclass
+    from typing import List
+
+    off_type = mia_offerta["tipo"]
+
+    # Crea un'offerta fake per riusare calcola_spesa_annua
+    @dataclass
+    class IntervalloFake:
+        fascia: str
+        prezzo: float
+        unita_misura: str
+
+    @dataclass
+    class ComponenteFake:
+        prezzi: list
+
+    @dataclass
+    class ScontoFake:
+        condizione_applicazione: str
+        prezzi: list
+        validita: str = ""
+        durata_mesi: int = 0
+
+    @dataclass
+    class CondizioneFake:
+        limitante: bool
+        descrizione: str = ""
+
+    @dataclass
+    class OffertaFake:
+        tipologia_fasce: str
+        tipo_offerta: str
+        componenti: list
+        sconti: list
+        condizioni: list
+        cod_offerta: str = "MIA_OFFERTA"
+        piva_utente: str = ""
+        nome_offerta: str = ""
+        url_offerta: str = ""
+
+    tariffa = mia_offerta["tariffa"]
+    quota_potenza = mia_offerta.get("quota_potenza", 0.0)
+    sconti = mia_offerta.get("sconti", 0.0)
+
+    componenti = []
+    if mia_offerta["quota_fissa"] > 0:
+        componenti.append(ComponenteFake(prezzi=[
+            IntervalloFake(fascia="unica", prezzo=mia_offerta["quota_fissa"], unita_misura="euro_anno"),
+        ]))
+    if quota_potenza > 0:
+        componenti.append(ComponenteFake(prezzi=[
+            IntervalloFake(fascia="unica", prezzo=quota_potenza, unita_misura="euro_kw_anno"),
+        ]))
+    if mia_offerta["prezzo_energia"] > 0:
+        componenti.append(ComponenteFake(prezzi=[
+            IntervalloFake(fascia="unica", prezzo=mia_offerta["prezzo_energia"], unita_misura="euro_kwh"),
+        ]))
+
+    # Sconti
+    sconti_list = []
+    if sconti < 0:
+        sconti_list.append(ScontoFake(condizione_applicazione="00", prezzi=[
+            IntervalloFake(fascia="unica", prezzo=abs(sconti), unita_misura="euro_anno"),
+        ]))
+
+    offerta_fake = OffertaFake(
+        tipologia_fasce=tariffa,
+        tipo_offerta=off_type,
+        componenti=componenti,
+        sconti=sconti_list,
+        condizioni=[],
+    )
+
+    risultato = calcola_spesa_annua(
+        offerta_fake, parametri, consumo_annuo, potenza, pun, residente,
+        confronto_portale=confronto_portale,
+        ignora_sconti_promo=ignora_sconti_promo,
+    )
+    return risultato
 
 
 def applica_iva(spesa: float, residente: bool) -> float:

@@ -19,8 +19,10 @@ Utilizza i **dati aperti** (Open Data) aggiornati quotidianamente dal portale [i
   - Range di consumo
   - Esclusione offerte con **condizioni limitanti** (vincoli, penali, obblighi socio, pannelli fotovoltaici, ecc.)
   - Esclusione offerte con **oneri di recesso**
-  - Filtro per parole chiave nelle condizioni contrattuali
-  - Filtro per venditore
+   - Filtro per parole chiave nelle condizioni contrattuali
+   - Filtro per venditore
+   - Filtro per zona geografica (codice ISTAT o nome regione, es. `02` / `"valle d'aosta"`)
+   - **Esclusione automatica** di offerte geolimitate con `--zona` se non compatibili con la regione specificata
 - **Calcolo spesa annua stimata**:
   - Componenti del venditore (spread, quote fisse, quote potenza)
   - PUN parametrico (ultimo mensile o valore custom)
@@ -51,6 +53,7 @@ Dipendenze:
 python main.py
 ```
 Lo script chiederà i dati essenziali (consumo, tariffa, prima/seconda casa) e le opzioni avanzate.  
+Premi Ctrl+C in qualsiasi momento per uscire.  
 Accetta **shortcut** per le scelte testuali:
 
 | Scelta | Shortcut valide |
@@ -98,6 +101,23 @@ python main.py \
   --no-oneri-recesso \
   --download \
   --output both
+
+# Prezzo variabile, escludi sconti promozionali (prime 5 offerte)
+python main.py \
+  --consumo-annuo 100 \
+  --tipo-offerta variabile \
+  --solo-semplici \
+  --no-oneri-recesso \
+  --confronto-portale \
+  --ignora-sconti-promo \
+  --max 5
+
+# Filtra per zona geografica (solo offerte disponibili in Toscana)
+python main.py \
+  --consumo-annuo 2700 \
+  --tipo-offerta tutte \
+  --solo-semplici \
+  --zona toscana
 ```
 
 ### Argomenti CLI
@@ -122,6 +142,29 @@ python main.py \
 | `--download` | Forza download file aggiornati | - |
 | `--output` | `terminal` / `csv` / `both` | `terminal` |
 | `--csv-path` | Percorso file CSV di output | auto |
+| `--confronta` | Confronta con la mia offerta attuale da `data/my_offer.json` (vedi nota sotto) | - |
+| `--max` | Numero massimo di offerte da mostrare in tabella | `50` |
+| `--ignora-sconti-promo` | Ignora sconti promozionali a validità limitata (es. sconti primi mesi) | - |
+| `--zona` | Filtra per zona geografica (codice ISTAT o nome, es. `02` / `"valle d'aosta"`). Se specificato, mostra solo offerte senza restrizioni geografiche o disponibili nella zona indicata. | - |
+
+---
+
+### Confronto con la mia offerta attuale (`--confronta`)
+
+Per confrontare le offerte del mercato con la tua tariffa attuale:
+
+```bash
+# 1. Copia lo stub
+cp data/my_offer_stub.json data/my_offer.json
+
+# 2. Modifica data/my_offer.json con i tuoi dati reali (prezzo energia, quote, ecc.)
+
+# 3. Esegui con --confronta
+python main.py --consumo-annuo 1000 --tipo-offerta fisso --solo-semplici --no-oneri-recesso --confronta
+```
+
+La tua offerta comparirà in fondo alla tabella con `★` e label "Attuale".  
+`my_offer.json` è in `.gitignore` (dati personali), `my_offer_stub.json` è tracciato come template.
 
 ---
 
@@ -162,28 +205,35 @@ comparatore_offerte/
 - **XML parsing**: il file offerte può superare i 20 MB. Usiamo `xml.etree.ElementTree.iterparse` con `clear()` per evitare saturazione RAM.
 - **PUN dinamico**: il valore di default è l'**ultimo PUN mensile** disponibile nel CSV prezzi storici (aggiornato mensilmente dal portale). L'utente può sovrascriverlo con `--pun` per simulare scenari.
 - **Oneri di sistema**: calcolati usando i parametri del CSV `PO_Parametri_Mercato_Libero_E_YYYYMMDD.csv`. I valori sono sommati in base al profilo (domestico residente / non residente / non domestico). La stima è approssimata ma confrontabile tra offerte.
-- **Condizioni limitanti**: nel XML, il campo `LIMITANTE` con valore `01` indica condizioni vincolanti. Il flag `--solo-semplici` le esclude controllando sia `LIMITANTE=01` sia la descrizione dell'offerta per parole chiave (pannelli fotovoltaici, socio, obblighi, ecc.).
+- **Condizioni limitanti**: nel XML, il campo `LIMITANTE` con valore `01` indica condizioni vincolanti. Il flag `--solo-semplici` le esclude controllando sia `LIMITANTE=01` sia la descrizione dell'offerta per parole chiave (pannelli fotovoltaici, socio, obblighi, bozza, ecc.).
 - **Sconti automatici**: il parser estrae e applica gli sconti senza condizioni (`CONDIZIONE_APPLICAZIONE=00`, es. sconti attivazione) dal XML. Gli sconti condizionali (fattura elettronica, SDD) non vengono applicati automaticamente.
+- **Sconti promozionali**: alcuni sconti hanno validità limitata (`VALIDITA=02`, es. "sconto primo mese", "sconto primi 6 mesi"). Usa `--ignora-sconti-promo` per escluderli dal calcolo annuale. Senza il flag, vengono applicati come se fossero validi per l'intero anno, sovrastimando la convenienza dell'offerta.
 - **Tipo attivazione**: ogni offerta nel XML specifica per quali tipi di attivazione è valida (nuova, cambio fornitore, voltura, subentro). Usa `--tipo-attivazione cambio` per vedere solo offerte per cambio fornitore (switching).
 - **Nomi venditori**: generati automaticamente dal dominio del sito web di ogni venditore. La mappa viene cachata in `data/venditori.json`. Se un nome non viene riconosciuto, viene mostrata la PIVA.
 - **Residenza**: la distinzione è tra **prima casa** (`--residente`) e **seconda casa** (`--non-residente`), non tra residenza anagrafica in Italia/estero.
+- **Zone geografiche**: l'XML include il campo `ZoneOfferta` con restrizioni regionali (`REGIONE`, codici ISTAT 01-20) e provinciali (`PROVINCIA`). Le offerte con restrizioni geografiche sono escluse automaticamente quando si usa `--zona`. Senza `--zona` vengono mostrate tutte. Usa `--zona toscana` o `--zona 09` per vedere solo quelle disponibili in Toscana.
 
 ---
 
 ## Esempio output terminale
 
 ```
-RISULTATI (1360 offerte trovate, prime 50 mostrate):
+RISULTATI (1200 offerte trovate, prime 10 mostrate)
 
-#   Venditore            Offerta                Tipo       Tariffa    Spesa Totale €/anno   Spesa Venditore    PUN      Condizioni
--------------------------------------------------------------------------------------------------------------------------------
-1   Martelius            LUCE SPAZIALE          fisso      monoraria  363.58                97.90              0.1200   No
-2   CVA                  CVA 7                  fisso      monoraria  364.46                98.70              0.1200   No
-3   Dolomiti Energia     DOLOMITI FISSO LUCE    fisso      monoraria  364.79                99.00              0.1200   No
+PUN: 0.1434 €/kWh
+Oneri fissi sistema: 155.53 €/anno | Oneri energia: 11.93 €/anno
+
+#   Venditore         Offerta                                  Cod.Offerta                      Tipo  Tariffa Spesa Tot.   Spesa Vend.
+--------------------------------------------------------------------------------------------------------------------------------------
+1   Tua Energia       M'ILLUMINO (monoraria, spread 0.0060)    030032ESVOL01XXMILLUMINEEDOM2511 Var   Mono  223.87       16.04
+2   Eniplenitude      Trend Casa Luce Plus (monoraria, sprea   026160ESVML49XX0LTCASAVPLU160626 Var   Mono  224.48       16.54
+3   Eniplenitude      Trend Casa Luce Plus (spread 0.0220)     026160ESVFL49XX0LTCASAVPLU160626 Var         227.16       18.74
+4   Senec             SENEC CLOUD DYNAMIC HOME                 028185ESVFL02XXDYNAMIC00DOMESTIC Var   Tri   232.78       23.34
+5   Sinergas          ALL DAY WEB LUCE                         000753ESFML06XXP0114PB3338260623 Fix   Mono  265.00       49.75
 ...
 
-Nota: gli importi sono stimati (IVA inclusa: 10% prima casa / 22% seconda casa).
-Il PUN è parametrico: usa --pun per simulare diversi scenari.
+Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).
+PUN usato: 0.1434 €/kWh. Usa --pun per cambiarlo.
 Usa --confronto-portale per escludere i costi fissi identici (sigma1/sigma2) e allinearti ai valori del portale ARERA.
 ```
 

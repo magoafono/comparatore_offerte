@@ -2,7 +2,7 @@
 
 from typing import List, Callable
 from parser import Offerta
-from config import BLACKLIST_CONDIZIONI_DEFAULT
+from config import BLACKLIST_CONDIZIONI_DEFAULT, REGIONI_MAP
 
 
 class FiltroOfferte:
@@ -92,6 +92,19 @@ class FiltroOfferte:
             return self
         return self.filtra(
             lambda o: any(t in o.tipologie_att_contr for t in tipi)
+        )
+
+    def by_zone_geografiche(self, zona: str = "") -> "FiltroOfferte":
+        if not zona:
+            return self
+        if zona in REGIONI_MAP:
+            zona_key = zona
+        else:
+            zona_key = next((k for k, v in REGIONI_MAP.items() if v == zona.lower()), None)
+        if zona_key is None:
+            return self.filtra(lambda o: len(o.regioni) == 0)
+        return self.filtra(
+            lambda o: len(o.regioni) == 0 or zona_key in o.regioni
         )
 
     def get(self) -> List[Offerta]:
