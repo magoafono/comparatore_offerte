@@ -1,5 +1,6 @@
 """Motore di filtri per le offerte."""
 
+import fnmatch
 from typing import List, Callable
 from parser import Offerta
 from config import BLACKLIST_CONDIZIONI_DEFAULT, REGIONI_MAP
@@ -61,7 +62,7 @@ class FiltroOfferte:
             lambda o: (
                 all(not c.limitante for c in o.condizioni)
                 and not any(
-                    kw in o.descrizione.lower()
+                    fnmatch.fnmatch(o.descrizione.lower(), f"*{kw}*")
                     for kw in BLACKLIST_CONDIZIONI_DEFAULT
                 )
             )

@@ -141,6 +141,8 @@ Esempi:
                         help="Ignora sconti promozionali (validità limitata) nel calcolo annuale")
     parser.add_argument("--zona", type=str, default="",
                         help="Filtra per zona geografica (codice ISTAT o nome, es. 02/'valle d'aosta').")
+    parser.add_argument("--verifica", action="store_true",
+                        help="Verifica presenza offerte sul sito venditore via DuckDuckGo (top N, ~15-20 sec)")
     return parser
 
 
@@ -171,6 +173,7 @@ def parse_args() -> Dict[str, Any]:
         "max": args.max,
         "ignora_sconti_promo": args.ignora_sconti_promo,
         "zona": args.zona,
+        "verifica": args.verifica,
     }
 
     # Se mancano dati essenziali, entra in modalità interattiva

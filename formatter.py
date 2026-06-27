@@ -30,6 +30,8 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         print(_color("Nessuna offerta trovata con i filtri specificati.", "yellow"))
         return
 
+    mostra_check = any(r.get("check") for r in risultati if not r.get("_mia"))
+
     # I risultati arrivano già ordinati da main.py
     mia_offerta = next((r for r in risultati if r.get("_mia")), None)
     pos_mia = next((i for i, r in enumerate(risultati) if r.get("_mia")), None)
@@ -45,11 +47,18 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
     print(f"   Oneri fissi sistema: {on_fissi:.2f} €/anno | Oneri energia: {on_en:.2f} €/anno\n")
 
     # Header
-    fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<5} {:<12} {}"
-    header = fmt_header.format(
-        "#", "Venditore", "Offerta", "Cod.Offerta", "Tipo", "Tariffa",
-        "Spesa Tot.", "Spesa Vend.",
-    )
+    if mostra_check:
+        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<5} {} {:<12} {}"
+        header = fmt_header.format(
+            "#", "Venditore", "Offerta", "Cod.Offerta", "Tipo", "Tariffa",
+            "Check", "Spesa Tot.", "Spesa Vend.",
+        )
+    else:
+        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<5} {:<12} {}"
+        header = fmt_header.format(
+            "#", "Venditore", "Offerta", "Cod.Offerta", "Tipo", "Tariffa",
+            "Spesa Tot.", "Spesa Vend.",
+        )
     print(_color(header, "bold"))
     print(_color("-" * len(header), "bold"))
 
@@ -73,7 +82,17 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         spesa_tot = f"{r.get('spesa_totale', 0):.2f}"
         spesa_vend = f"{r.get('spesa_venditore', 0):.2f}"
 
-        row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
+        if mostra_check:
+            check = r.get("check", "")
+            if check == "✓":
+                check_fmt = _color(" ✓", "green")
+            elif check == "ND":
+                check_fmt = _color("ND", "yellow")
+            else:
+                check_fmt = f" {check}"
+            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {check_fmt:<5} {spesa_tot:<12} {spesa_vend}"
+        else:
+            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
         print(row)
 
     # Se mia offerta è fuori dalla top N, mostra in fondo
@@ -87,7 +106,10 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         tariffa = TARIFFA_MAP.get(r.get("tipologia_fasce", ""), r.get("tipologia_fasce", ""))[:5]
         spesa_tot = f"{r.get('spesa_totale', 0):.2f}"
         spesa_vend = f"{r.get('spesa_venditore', 0):.2f}"
-        row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
+        if mostra_check:
+            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {'':<5} {spesa_tot:<12} {spesa_vend}"
+        else:
+            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
         print(row)
 
     print("\n" + _color("Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).", "yellow"))
@@ -103,7 +125,7 @@ def esporta_csv(risultati: List[Dict], output_path: Path):
 
     fieldnames = [
         "rank", "cod_offerta", "venditore", "nome_venditore", "nome_offerta", "tipo_offerta",
-        "tipologia_fasce", "spesa_totale", "spesa_venditore",
+        "tipologia_fasce", "check", "spesa_totale", "spesa_venditore",
         "costo_fisso_venditore", "costo_potenza_venditore",
         "costo_energia_venditore", "costo_pun", "oneri_fissi_sistema",
         "oneri_energia_sistema", "iva", "pun_usato", "url_offerta",

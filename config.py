@@ -106,7 +106,7 @@ FASCIA_MAP = {
 BLACKLIST_CONDIZIONI_DEFAULT = [
     "socio",
     "pannello",
-    "fotovoltaico",
+    "fotovoltaic*",
     "obbligatorio",
     "sottoscrivere",
     "convenzione",

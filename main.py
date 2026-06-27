@@ -12,6 +12,7 @@ from calculator import calcola_spesa_annua, calcola_mia_offerta, applica_iva
 from formatter import stampa_tabella, esporta_csv
 from cli import parse_args
 from venditori import build_vendor_map, get_vendor_name
+from verifica import verifica_offerte
 
 from collections import defaultdict
 
@@ -90,6 +91,7 @@ def main():
     max_offerte = config["max"]
     ignora_sconti_promo = config["ignora_sconti_promo"]
     zona = config["zona"]
+    verifica = config["verifica"]
 
     print(f"\n🔍 Comparatore Offerte - Mercato Libero {commodity.title()}")
     print(f"   Consumo: {consumo_annuo} kWh/anno | Potenza: {potenza} kW | Tariffa: {tipo_tariffa}")
@@ -223,6 +225,17 @@ def main():
 
     # Ordina per spesa totale crescente
     risultati.sort(key=lambda x: x["spesa_totale"])
+
+    # 4c. Verifica presenza sul sito venditore (opzionale, top N)
+    if verifica:
+        print("🔍 Verifica offerte su DuckDuckGo...")
+        stati = verifica_offerte(risultati, limite=max_offerte)
+        for r in risultati:
+            cod = r.get("cod_offerta", "")
+            if cod in stati:
+                r["check"] = stati[cod]
+        trovati = sum(1 for v in stati.values() if v == "✓")
+        print(f"   {trovati}/{len(stati)} offerte trovate sul sito venditore")
 
     # 5. Output
     if output_mode in ("terminal", "both"):
