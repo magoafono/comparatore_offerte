@@ -71,7 +71,7 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         if r.get("_mia"):
             if pos_mia > 0:
                 print(_color("-" * len(header), "bold"))
-            rank = _color("★", "cyan")
+            rank = _color("★", "cyan") + "  "
             nome = r.get("nome_offerta", "")[:38]
         else:
             rank = str(i)
@@ -119,9 +119,9 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         spesa_tot = f"{r.get('spesa_totale', 0):.2f}"
         spesa_vend = f"{r.get('spesa_venditore', 0):.2f}"
         if mostra_check:
-                row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':6} {'':5} {spesa_tot:<12} {spesa_vend}"
+                row = f"{_color('★', 'cyan')}   {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':6} {'':5} {spesa_tot:<12} {spesa_vend}"
         else:
-            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':5} {spesa_tot:<12} {spesa_vend}"
+            row = f"{_color('★', 'cyan')}   {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':5} {spesa_tot:<12} {spesa_vend}"
         print(row)
 
     print("\n" + _color("Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).", "yellow"))
