@@ -1,0 +1,20 @@
+{
+  "_note": "★ campi obbligatori | ☆ opzionali (default 0 se omessi)",
+  "_note_venditore": "★ Nome visualizzato nei risultati (es. 'Il mio attuale')",
+  "venditore": "Il mio attuale",
+  "_note_offerta": "★ Nome della tua offerta (es. 'Offerta X')",
+  "nome_offerta": "Offerta X",
+  "_note_tipo": "★ 'fisso' o 'variabile'",
+  "tipo": "variabile",
+  "_note_tariffa": "★ 'monoraria', 'bioraria' o 'trifaria'",
+  "tariffa": "monoraria",
+  "_note_prezzo": "★ €/kWh. Se tipo=fisso è il prezzo fisso, se variabile è lo spread sul PUN",
+  "prezzo_energia": 0.125,
+  "_note_quota_fissa": "★ €/anno. Metti 0 se non c'è",
+  "quota_fissa": 120.0,
+  "_note_quota_potenza": "☆ €/kW/anno. Default 0",
+  "quota_potenza": 30.0,
+  "_note_sconti": "☆ €/anno (valore negativo = risparmio, es. -10). Default 0",
+  "sconti": 0.0,
+  "_nota": "I campi _note vengono ignorati dal programma. Modifica solo i valori."
+}

@@ -1,6 +1,7 @@
 """Formattazione output: tabella terminale e CSV."""
 
 import csv
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
@@ -22,6 +23,10 @@ def _color(text: str, color: str) -> str:
 
 TIPO_MAP = {"fisso": "Fix", "variabile": "Var"}
 TARIFFA_MAP = {"monoraria": "Mono", "bioraria": "Bi", "trifaria": "Tri"}
+
+
+def _vislen(s: str) -> int:
+    return len(re.sub(r"\033\[[0-9;]*m", "", s))
 
 
 def stampa_tabella(risultati: List[Dict], limite: int = 50):
@@ -48,29 +53,26 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
 
     # Header
     if mostra_check:
-        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<5} {} {:<12} {}"
+        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<7} {:<6} {:<5} {:<12} {}"
         header = fmt_header.format(
             "#", "Venditore", "Offerta", "Cod.Offerta", "Tipo", "Tariffa",
-            "Check", "Spesa Tot.", "Spesa Vend.",
+            "Check", "Conf", "Spesa Tot.", "Spesa Vend.",
         )
     else:
-        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<5} {:<12} {}"
+        fmt_header = "{:<3} {:<17} {:<40} {:<32} {:<5} {:<7} {:<5} {:<12} {}"
         header = fmt_header.format(
             "#", "Venditore", "Offerta", "Cod.Offerta", "Tipo", "Tariffa",
-            "Spesa Tot.", "Spesa Vend.",
+            "Conf", "Spesa Tot.", "Spesa Vend.",
         )
     print(_color(header, "bold"))
     print(_color("-" * len(header), "bold"))
 
-    mia_extra = False
     for i, r in enumerate(risultati[:limite], 1):
         if r.get("_mia"):
-            if i <= limite:
-                rank = _color("★", "cyan")
-                nome = r.get("nome_offerta", "")[:38]
-            else:
-                mia_extra = True
-                continue
+            if pos_mia > 0:
+                print(_color("-" * len(header), "bold"))
+            rank = _color("★", "cyan")
+            nome = r.get("nome_offerta", "")[:38]
         else:
             rank = str(i)
             nome = r.get("nome_offerta", "")[:38]
@@ -82,17 +84,27 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         spesa_tot = f"{r.get('spesa_totale', 0):.2f}"
         spesa_vend = f"{r.get('spesa_venditore', 0):.2f}"
 
+        conf = r.get("confidenza", "green")
+        conf_dot = _color("●", conf)
+        conf_fmt = " " + conf_dot
+        conf_fmt += " " * max(0, 5 - _vislen(conf_fmt))
+
         if mostra_check:
             check = r.get("check", "")
-            if check == "✓":
-                check_fmt = _color(" ✓", "green")
-            elif check == "ND":
-                check_fmt = _color("ND", "yellow")
-            else:
-                check_fmt = f" {check}"
-            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {check_fmt:<5} {spesa_tot:<12} {spesa_vend}"
+            simboli = check.split(" ")
+            colored = []
+            for s in simboli:
+                if s == "✓":
+                    colored.append(_color("✓", "green"))
+                elif s in ("✗", "!"):
+                    colored.append(_color(s, "red"))
+                else:
+                    colored.append(s)
+            check_fmt = " " + " ".join(colored)
+            check_fmt += " " * max(0, 6 - _vislen(check_fmt))
+            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {check_fmt} {conf_fmt} {spesa_tot:<12} {spesa_vend}"
         else:
-            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
+            row = f"{rank:<3} {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {conf_fmt} {spesa_tot:<12} {spesa_vend}"
         print(row)
 
     # Se mia offerta è fuori dalla top N, mostra in fondo
@@ -107,9 +119,9 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         spesa_tot = f"{r.get('spesa_totale', 0):.2f}"
         spesa_vend = f"{r.get('spesa_venditore', 0):.2f}"
         if mostra_check:
-            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {'':<5} {spesa_tot:<12} {spesa_vend}"
+                row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':6} {'':5} {spesa_tot:<12} {spesa_vend}"
         else:
-            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<5} {spesa_tot:<12} {spesa_vend}"
+            row = f"{_color('★', 'cyan')}  {venditore:<17} {nome:<40} {codice:<32} {tipo:<5} {tariffa:<7} {'':5} {spesa_tot:<12} {spesa_vend}"
         print(row)
 
     print("\n" + _color("Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).", "yellow"))
@@ -125,7 +137,7 @@ def esporta_csv(risultati: List[Dict], output_path: Path):
 
     fieldnames = [
         "rank", "cod_offerta", "venditore", "nome_venditore", "nome_offerta", "tipo_offerta",
-        "tipologia_fasce", "check", "spesa_totale", "spesa_venditore",
+        "tipologia_fasce", "check", "confidenza", "spesa_totale", "spesa_venditore",
         "costo_fisso_venditore", "costo_potenza_venditore",
         "costo_energia_venditore", "costo_pun", "oneri_fissi_sistema",
         "oneri_energia_sistema", "iva", "pun_usato", "url_offerta",

@@ -130,6 +130,8 @@ BLACKLIST_CONDIZIONI_DEFAULT = [
     "universo casa",
     "tim energia",
     "bozza",
+    "gia' sottoscritto",
+    "già sottoscritto",
 ]
 
 # Parametri di sistema per profilo: pattern di ricerca nel CSV parametri

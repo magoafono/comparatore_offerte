@@ -12,7 +12,7 @@ from calculator import calcola_spesa_annua, calcola_mia_offerta, applica_iva
 from formatter import stampa_tabella, esporta_csv
 from cli import parse_args
 from venditori import build_vendor_map, get_vendor_name
-from verifica import verifica_offerte
+from verifica import verifica_offerte, warn_cache_stale
 
 from collections import defaultdict
 
@@ -184,6 +184,7 @@ def main():
             "url_offerta": offerta.url_offerta,
             "condizioni_limitanti": condizioni_limitanti,
             "descrizione_condizioni": descrizione_condizioni,
+            "confidenza": dettagli["confidenza"],
         })
 
     # 4b. Confronto con la mia offerta attuale
@@ -217,6 +218,7 @@ def main():
                 "url_offerta": "",
                 "condizioni_limitanti": False,
                 "descrizione_condizioni": "",
+                "confidenza": dettagli.get("confidenza", "green"),
             })
             spesa_iva = applica_iva(dettagli["spesa_totale"], residente)
             print(f"   {mia['venditore']} - {mia['nome_offerta']}: {spesa_iva:.2f} €/anno")
@@ -226,16 +228,91 @@ def main():
     # Ordina per spesa totale crescente
     risultati.sort(key=lambda x: x["spesa_totale"])
 
-    # 4c. Verifica presenza sul sito venditore (opzionale, top N)
-    if verifica:
-        print("🔍 Verifica offerte su DuckDuckGo...")
-        stati = verifica_offerte(risultati, limite=max_offerte)
-        for r in risultati:
-            cod = r.get("cod_offerta", "")
-            if cod in stati:
-                r["check"] = stati[cod]
-        trovati = sum(1 for v in stati.values() if v == "✓")
-        print(f"   {trovati}/{len(stati)} offerte trovate sul sito venditore")
+    # 4c. Verifica sito venditore (opzionale)
+    if verifica == "normal":
+        print("🔍 Verifica offerte su Google (Serper.dev)...")
+        stati, _ = verifica_offerte(risultati, limite=max_offerte)
+        if not stati:
+            verifica = None
+        else:
+            for r in risultati:
+                cod = r.get("cod_offerta", "")
+                if cod in stati:
+                    r["check"] = stati[cod]
+            ok = sum(1 for v in stati.values() if v == "✓")
+            print(f"   {ok}/{len(stati)} offerte trovate sul sito venditore")
+
+    elif verifica == "strict":
+        mia_entry = next((r for r in risultati if r.get("_mia")), None)
+        if mia_entry:
+            risultati = [r for r in risultati if not r.get("_mia")]
+
+        stima = max_offerte * 4
+        print(f"\n⚠️  Verifica 'strict': per trovare {max_offerte} offerte verificate "
+              f"potrebbero servire fino a ~{stima} chiamate a Serper.dev "
+              f"(massimo 2500/mese).")
+        val = input(f"   Offerte verificate da cercare [{max_offerte}] (0 = annulla): ").strip()
+        if not val:
+            cerca = max_offerte
+        else:
+            try:
+                cerca = int(val)
+            except ValueError:
+                cerca = 0
+        if cerca <= 0:
+            print("   Verifica saltata.")
+            verifica = None
+        else:
+            print(f"🔍 Verifica 'strict': cerco {cerca} offerte verificate...")
+            batch = max_offerte
+            verificate = []
+            chiamate_fatte = 0
+
+            stati, nuove = verifica_offerte(risultati, limite=batch)
+            if not stati:
+                verifica = None
+            else:
+                chiamate_fatte += nuove
+                for r in risultati:
+                    cod = r.get("cod_offerta", "")
+                    if cod in stati:
+                        r["check"] = stati[cod]
+
+                if nuove == 0:
+                    stati_all, _ = verifica_offerte(risultati, limite=len(risultati))
+                    for r in risultati:
+                        cod = r.get("cod_offerta", "")
+                        if cod in stati_all:
+                            r["check"] = stati_all[cod]
+                    verificate = [r for r in risultati if "✓" in r.get("check", "")]
+                else:
+                    verificate = [r for r in risultati[:batch] if "✓" in r.get("check", "")]
+                    while len(verificate) < cerca and batch < len(risultati):
+                        batch = min(batch + max_offerte, len(risultati))
+                        stati, nuove = verifica_offerte(risultati, limite=batch)
+                        if not stati:
+                            break
+                        chiamate_fatte += nuove
+                        for r in risultati:
+                            cod = r.get("cod_offerta", "")
+                            if cod in stati:
+                                r["check"] = stati[cod]
+                        verificate = [r for r in risultati[:batch] if "✓" in r.get("check", "")]
+
+                if verificate:
+                    trovate = min(len(verificate), cerca)
+                    print(f"   {trovate} offerte verificate trovate "
+                          f"(usate {chiamate_fatte} chiamate)")
+                    if trovate < cerca:
+                        print(f"   ✋ Solo {trovate} offerte verificate su {cerca} "
+                              f"(esaurite le offerte da controllare).")
+                    risultati = verificate[:trovate]
+                else:
+                    print(f"   Nessuna offerta verificata trovata (usate {chiamate_fatte} chiamate).")
+                    risultati = []
+
+        if mia_entry:
+            risultati.append(mia_entry)
 
     # 5. Output
     if output_mode in ("terminal", "both"):
@@ -250,6 +327,9 @@ def main():
         esporta_csv(risultati, csv_path)
 
     print("\n✅ Completato!")
+
+    if verifica:
+        warn_cache_stale()
 
 
 if __name__ == "__main__":

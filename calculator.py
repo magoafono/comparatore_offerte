@@ -1,8 +1,37 @@
 """Calcolo della spesa annua stimata per ogni offerta."""
 
 from typing import Dict, List
-from parser import Offerta, IntervalloPrezzo
+from parser import Offerta, IntervalloPrezzo, Sconto
 from config import PROFILO_CONSUMO
+
+SCONTI_PROMO_KEYWORDS = [
+    "primo anno", "primi 12", "primi mesi",
+    "nei primi", "una tantum", "benvenuto",
+    "adesione", "attivazione",
+]
+
+
+def _is_sconto_promozionale(sc: Sconto) -> bool:
+    if sc.validita == "02":
+        return True
+    if sc.validita == "01":
+        testo = f"{sc.nome} {sc.descrizione}".lower()
+        for kw in SCONTI_PROMO_KEYWORDS:
+            if kw in testo:
+                return True
+    return False
+
+
+def _calcola_confidenza(offerta) -> str:
+    for sc in offerta.sconti:
+        if sc.validita == "01" and sc.durata_mesi == 0:
+            testo = f"{sc.nome} {sc.descrizione}".lower()
+            if any(kw in testo for kw in SCONTI_PROMO_KEYWORDS):
+                return "red"
+    for sc in offerta.sconti:
+        if sc.validita == "01" and sc.durata_mesi == 0:
+            return "yellow"
+    return "green"
 
 
 def calcola_spesa_annua(
@@ -55,11 +84,9 @@ def calcola_spesa_annua(
     # --- 2b. Sconti automatici (senza condizioni speciali) ---
     sconti_totali = 0.0
     for sc in offerta.sconti:
-        # Applica solo sconti automatici (CONDIZIONE_APPLICAZIONE=00 -> nessuna condizione)
         if sc.condizione_applicazione != "00":
             continue
-        # Se richiesto, ignora sconti promozionali (VALIDITA=02 -> validità limitata)
-        if ignora_sconti_promo and sc.validita == "02":
+        if ignora_sconti_promo and _is_sconto_promozionale(sc):
             continue
         for p in sc.prezzi:
             if p.unita_misura == "euro_anno":
@@ -67,6 +94,8 @@ def calcola_spesa_annua(
             elif p.unita_misura == "euro_kwh":
                 sconti_totali += p.prezzo * consumo_annuo
     spesa_venditore = max(0.0, spesa_venditore - sconti_totali)
+
+    confidenza = _calcola_confidenza(offerta)
 
     # --- 3. Oneri di sistema ---
     oneri_fissi, oneri_kwh = _calcola_oneri_sistema(parametri, potenza, residente, confronto_portale=confronto_portale)
@@ -85,6 +114,7 @@ def calcola_spesa_annua(
         "oneri_fissi_sistema": round(costo_oneri_fissi, 2),
         "oneri_energia_sistema": round(costo_oneri_energia, 2),
         "pun_usato": round(pun, 5),
+        "confidenza": confidenza,
     }
 
 

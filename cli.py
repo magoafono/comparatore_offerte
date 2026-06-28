@@ -141,8 +141,11 @@ Esempi:
                         help="Ignora sconti promozionali (validità limitata) nel calcolo annuale")
     parser.add_argument("--zona", type=str, default="",
                         help="Filtra per zona geografica (codice ISTAT o nome, es. 02/'valle d'aosta').")
-    parser.add_argument("--verifica", action="store_true",
-                        help="Verifica presenza offerte sul sito venditore via DuckDuckGo (top N, ~15-20 sec)")
+    parser.add_argument("--verifica", nargs="?", const="normal", default=None,
+                        choices=["normal", "strict"],
+                        help="Verifica presenza offerte sul sito venditore via Google (Serper.dev). "
+                             "'normal' = colonna Check; 'strict' = solo offerte verificate. "
+                             "Richiede SERPER_API_KEY.")
     return parser
 
 

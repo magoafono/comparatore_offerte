@@ -22,6 +22,9 @@ data/venditori.json
 # Mia offerta attuale (configurazione utente, NON committare)
 data/my_offer.json
 
+# Cache verifica Serper
+data/verifica_cache.json
+
 # my_offer_stub.json è tracciato (template per utente)
 
 # IDE / editor
@@ -30,6 +33,8 @@ data/my_offer.json
 *.swp
 *.swo
 *~
+\#*
+.#*
 *.bak
 *.old
 *.orig
