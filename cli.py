@@ -94,9 +94,9 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Esempi:
-  python main.py                              # Modalità interattiva
+  python main.py                                    # Modalità interattiva
   python main.py --consumo-annuo 1000 --potenza 3 --tipo-tariffa monoraria
-  python main.py --non-residente --consumo-annuo 2000 --pun 0.12 --solo-semplici --output both
+  python main.py --non-residente --consumo-annuo 2000 --pun 0.12 --senza-vincoli --output both
         """,
     )
     parser.add_argument("--commodity", choices=["elettrico", "gas"], default="elettrico",
@@ -114,16 +114,20 @@ Esempi:
                         choices=["tutte", "fisso", "variabile"],
                         help="Tipo prezzo (default: tutte)")
     parser.add_argument("--pun", type=float, help="Valore PUN in €/kWh (default: ultimo mensile)")
-    parser.add_argument("--exclude-condizioni", type=str, default="",
-                        help="Parole chiave da escludere nelle condizioni, separate da virgola")
-    parser.add_argument("--solo-semplici", action="store_true",
-                        help="Escludi offerte con condizioni limitanti (LIMITANTE=01)")
+    parser.add_argument("--escludi-parole", type=str, default="",
+                        help="Esclude offerte le cui condizioni contengono queste parole "
+                             "(separate da virgola, es: --escludi-parole 'fotovoltaico, pannelli')")
+    parser.add_argument("--senza-vincoli", action="store_true",
+                        help="Esclude offerte con condizioni limitanti (LIMITANTE=01: "
+                             "vincoli, obblighi, requisiti particolari)")
     parser.add_argument("--no-oneri-recesso", action="store_true",
                         help="Escludi offerte con penali/oneri di recesso")
-    parser.add_argument("--venditori", type=str, default="",
-                        help="Filtra per venditori (PIVA separate da virgola)")
-    parser.add_argument("--download", action="store_true",
-                        help="Forza il download dei file aggiornati")
+    parser.add_argument("--filtra-venditori", type=str, default="",
+                        help="Mostra solo le offerte dei venditori con queste PIVA "
+                             "(separate da virgola, es: --filtra-venditori 01877220366,001046)")
+    parser.add_argument("--aggiorna-dati", action="store_true",
+                        help="Forza il download dei file aggiornati dal portale "
+                             "(anziché usare i dati in cache)")
     parser.add_argument("--output", choices=["terminal", "csv", "both"], default="terminal",
                         help="Modalità di output (default: terminal)")
     parser.add_argument("--csv-path", type=str, default="",
@@ -133,14 +137,17 @@ Esempi:
     parser.add_argument("--tipo-attivazione", default="tutte",
                         choices=["tutte", "nuova", "cambio", "voltura", "subentro"],
                         help="Tipo di attivazione (default: tutte)")
-    parser.add_argument("--confronta", action="store_true",
-                        help="Confronta con la mia offerta attuale da data/my_offer.json")
+    parser.add_argument("--confronto-mia-offerta", action="store_true",
+                        help="Confronta con la mia offerta attuale da data/my_offer.json "
+                             "(mostra una riga ★ in fondo alla tabella)")
     parser.add_argument("--max", type=int, default=50,
                         help="Numero massimo di offerte da mostrare (default: 50)")
     parser.add_argument("--ignora-sconti-promo", action="store_true",
                         help="Ignora sconti promozionali (validità limitata) nel calcolo annuale")
-    parser.add_argument("--zona", type=str, default="",
-                        help="Filtra per zona geografica (codice ISTAT o nome, es. 02/'valle d'aosta').")
+    parser.add_argument("--regione", type=str, default="",
+                        help="Filtra per regione (codice ISTAT a 2 cifre o nome). "
+                             "Es: --regione toscana o --regione 09. "
+                             "Senza il flag, mostra tutte le offerte incluse quelle geolimitate.")
     parser.add_argument("--verifica", nargs="?", const="normal", default=None,
                         choices=["normal", "strict"],
                         help="Verifica presenza offerte sul sito venditore via Google (Serper.dev). "
@@ -163,19 +170,19 @@ def parse_args() -> Dict[str, Any]:
         "tipo_tariffa": args.tipo_tariffa,
         "tipo_offerta": args.tipo_offerta,
         "pun": args.pun,
-        "exclude_condizioni": [k.strip() for k in args.exclude_condizioni.split(",") if k.strip()],
-        "solo_semplici": args.solo_semplici,
+        "exclude_condizioni": [k.strip() for k in args.escludi_parole.split(",") if k.strip()],
+        "solo_semplici": args.senza_vincoli,
         "no_oneri_recesso": args.no_oneri_recesso,
-        "venditori": [v.strip() for v in args.venditori.split(",") if v.strip()],
-        "download": args.download,
+        "venditori": [v.strip() for v in args.filtra_venditori.split(",") if v.strip()],
+        "download": args.aggiorna_dati,
         "output": args.output,
         "csv_path": args.csv_path,
         "confronto_portale": args.confronto_portale,
         "tipo_attivazione": args.tipo_attivazione,
-        "confronta": args.confronta,
+        "confronta": args.confronto_mia_offerta,
         "max": args.max,
         "ignora_sconti_promo": args.ignora_sconti_promo,
-        "zona": args.zona,
+        "zona": args.regione,
         "verifica": args.verifica,
     }
 

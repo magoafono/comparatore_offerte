@@ -24,7 +24,7 @@ Utilizza i **dati aperti** (Open Data) aggiornati quotidianamente dal portale [i
   - Filtro per zona geografica (codice ISTAT o nome regione, es. `02` / `"valle d'aosta"`)
   - **Verifica presenza sul sito venditore** via Google (Serper.dev, opzionale, colonna Check ✓/✗)
   - **Colonna Confidenza** (● verde/giallo/rosso): segnala se gli sconti hanno durata certa o incerta
-  - **Esclusione automatica** di offerte geolimitate con `--zona` se non compatibili con la regione specificata
+  - **Esclusione automatica** di offerte geolimitate con `--regione` se non compatibili con la regione specificata
 - **Calcolo spesa annua stimata**:
   - Componenti del venditore (spread, quote fisse, quote potenza)
   - PUN parametrico (ultimo mensile o valore custom)
@@ -89,7 +89,7 @@ Accetta **shortcut** per le scelte testuali:
 python main.py --consumo-annuo 1000
 
 # Ricerca come sul portale ARERA: cambio fornitore, prezzo fisso, escludi oneri
-python main.py --non-residente --consumo-annuo 100 --tipo-offerta fisso --tipo-attivazione cambio --solo-semplici --no-oneri-recesso --confronto-portale
+python main.py --non-residente --consumo-annuo 100 --tipo-offerta fisso --tipo-attivazione cambio --senza-vincoli --no-oneri-recesso --confronto-portale
 
 # Solo prezzo variabile, seconda casa, PUN custom
 python main.py --non-residente --consumo-annuo 2000 --tipo-offerta variabile --pun 0.12
@@ -99,33 +99,33 @@ python main.py \
   --consumo-annuo 1500 \
   --tipo-tariffa trifaria \
   --tipo-offerta fisso \
-  --solo-semplici \
+  --senza-vincoli \
   --no-oneri-recesso \
-  --download \
+  --aggiorna-dati \
   --output both
 
 # Prezzo variabile, escludi sconti promozionali (prime 5 offerte)
 python main.py \
   --consumo-annuo 100 \
   --tipo-offerta variabile \
-  --solo-semplici \
+  --senza-vincoli \
   --no-oneri-recesso \
   --confronto-portale \
   --ignora-sconti-promo \
   --max 5
 
-# Filtra per zona geografica (solo offerte disponibili in Toscana)
+# Filtra per regione (solo offerte disponibili in Toscana)
 python main.py \
   --consumo-annuo 2700 \
   --tipo-offerta tutte \
-  --solo-semplici \
-  --zona toscana
+  --senza-vincoli \
+  --regione toscana
 
 # Verifica presenza offerte sul sito venditore (richiede chiave Serper.dev)
 export SERPER_API_KEY="la_tua_chiave"
 python main.py \
   --consumo-annuo 2700 \
-  --solo-semplici \
+  --senza-vincoli \
   --no-oneri-recesso \
   --verifica
 
@@ -133,7 +133,7 @@ python main.py \
 export SERPER_API_KEY="la_tua_chiave"
 python main.py \
   --consumo-annuo 2700 \
-  --solo-semplici \
+  --senza-vincoli \
   --no-oneri-recesso \
   --max 10 \
   --verifica strict
@@ -153,23 +153,23 @@ python main.py \
 | `--tipo-offerta` | `tutte` / `fisso` / `variabile` | `tutte` |
 | `--tipo-attivazione` | `tutte` / `nuova` / `cambio` / `voltura` / `subentro` | `tutte` |
 | `--pun` | Valore PUN in €/kWh (sovrascrive l'ultimo mensile) | auto |
-| `--solo-semplici` | Esclude offerte con `LIMITANTE=01` (vincoli) | - |
+| `--senza-vincoli` | Esclude offerte con condizioni limitanti (`LIMITANTE=01`: vincoli, obblighi, requisiti particolari) | - |
 | `--no-oneri-recesso` | Esclude offerte con oneri di recesso (`LIMITANTE=01` come il portale) | - |
 | `--confronto-portale` | Esclude costi fissi identici (sigma1/sigma2) per allinearsi al portale ARERA | - |
-| `--exclude-condizioni` | Parole chiave da escludere (virgola) | - |
-| `--venditori` | Filtra per PIVA venditori (virgola) | - |
-| `--download` | Forza download file aggiornati | - |
+| `--escludi-parole` | Esclude offerte con queste parole nelle condizioni contrattuali. Lista separata da virgola. Es: `--escludi-parole "fotovoltaico, pannelli"` | - |
+| `--filtra-venditori` | Mostra **solo** le offerte dei venditori con queste PIVA (separate da virgola). Es: `--filtra-venditori 01877220366,001046` | - |
+| `--aggiorna-dati` | Forza download file aggiornati dal portale (anziché usare la cache) | - |
 | `--output` | `terminal` / `csv` / `both` | `terminal` |
 | `--csv-path` | Percorso file CSV di output | auto |
-| `--confronta` | Confronta con la mia offerta attuale da `data/my_offer.json` (vedi nota sotto) | - |
+| `--confronto-mia-offerta` | Confronta con la mia offerta attuale da `data/my_offer.json` (mostra riga ★ in fondo) | - |
 | `--max` | Numero massimo di offerte da mostrare in tabella | `50` |
 | `--ignora-sconti-promo` | Ignora sconti promozionali e temporanei: `VALIDITA=02` (promozioni esplicite) + sconti `VALIDITA=01` con durata incerta e keyword promozionali (es. "primo anno", "attivazione", "benvenuto") | - |
-| `--zona` | Filtra per zona geografica (codice ISTAT o nome, es. `02` / `"valle d'aosta"`). Se specificato, mostra solo offerte senza restrizioni geografiche o disponibili nella zona indicata. | - |
+| `--regione` | Filtra per regione (codice ISTAT a 2 cifre o nome). Es: `--regione toscana` o `--regione 09`. Senza il flag, mostra tutte le offerte incluse quelle geolimitate. | - |
 | `--verifica` | Verifica presenza offerte sul sito venditore via Google (Serper.dev). `--verifica` = colonna Check; `--verifica strict` = solo offerte verificate (scorre in batch, chiede tetto chiamate). Richiede `SERPER_API_KEY`. | - |
 
 ---
 
-### Confronto con la mia offerta attuale (`--confronta`)
+### Confronto con la mia offerta attuale (`--confronto-mia-offerta`)
 
 Per confrontare le offerte del mercato con la tua tariffa attuale:
 
@@ -179,8 +179,8 @@ cp data/my_offer_stub.json data/my_offer.json
 
 # 2. Modifica data/my_offer.json con i tuoi dati reali (prezzo energia, quote, ecc.)
 
-# 3. Esegui con --confronta
-python main.py --consumo-annuo 1000 --tipo-offerta fisso --solo-semplici --no-oneri-recesso --confronta
+# 3. Esegui con --confronto-mia-offerta
+python main.py --consumo-annuo 1000 --tipo-offerta fisso --senza-vincoli --no-oneri-recesso --confronto-mia-offerta
 ```
 
 La tua offerta comparirà in fondo alla tabella con `★` e label "Attuale".  
@@ -269,7 +269,7 @@ comparatore_offerte/
 - **XML parsing**: il file offerte può superare i 20 MB. Usiamo `xml.etree.ElementTree.iterparse` con `clear()` per evitare saturazione RAM.
 - **PUN dinamico**: il valore di default è l'**ultimo PUN mensile** disponibile nel CSV prezzi storici (aggiornato mensilmente dal portale). L'utente può sovrascriverlo con `--pun` per simulare scenari.
 - **Oneri di sistema**: calcolati usando i parametri del CSV `PO_Parametri_Mercato_Libero_E_YYYYMMDD.csv`. I valori sono sommati in base al profilo (domestico residente / non residente / non domestico). La stima è approssimata ma confrontabile tra offerte.
-- **Condizioni limitanti**: nel XML, il campo `LIMITANTE` con valore `01` indica condizioni vincolanti. Il flag `--solo-semplici` le esclude controllando sia `LIMITANTE=01` sia la descrizione dell'offerta per parole chiave (pannelli fotovoltaici, socio, obblighi, bozza, ecc.).
+- **Condizioni limitanti**: nel XML, il campo `LIMITANTE` con valore `01` indica condizioni vincolanti. Il flag `--senza-vincoli` le esclude controllando sia `LIMITANTE=01` sia la descrizione dell'offerta per parole chiave (pannelli fotovoltaici, socio, obblighi, bozza, ecc.).
 - **Sconti automatici**: il parser estrae e applica gli sconti senza condizioni (`CONDIZIONE_APPLICAZIONE=00`, es. sconti attivazione) dal XML. Gli sconti condizionali (fattura elettronica, SDD) non vengono applicati automaticamente.
 - **Sconti promozionali**: alcuni sconti hanno validità limitata (`VALIDITA=02`, es. "sconto primo mese", "sconto primi 6 mesi"). Usa `--ignora-sconti-promo` per escluderli dal calcolo annuale. Il flag ora rileva anche sconti `VALIDITA=01` con keyword promozionali nel nome/descrizione (es. "primo anno", "attivazione", "benvenuto", "nei primi", "una tantum") per compensare dati XML imprecisi.
 - **Colonna Confidenza** (`Conf`): ● verde = sconti con durata certa; ● giallo = sconti `VALIDITA=01` senza durata specificata nel XML (incertezza moderata); ● rosso = sconti `VALIDITA=01` con keyword promozionali e durata sconosciuta (probabile sconto temporaneo, il prezzo annuale potrebbe essere ottimista). La colonna è indipendente dal flag `--ignora-sconti-promo`.
@@ -277,7 +277,7 @@ comparatore_offerte/
 - **Nomi venditori**: generati automaticamente dal dominio del sito web di ogni venditore. La mappa viene cachata in `data/venditori.json`. Se un nome non viene riconosciuto, viene mostrata la PIVA.
 - **Verifica offerte (`--verifica`)**: usa l'API Serper.dev per cercare il codice offerta e il nome offerta su Google. Per ogni offerta vengono fatte sempre **entrambe** le ricerche (codice esatto + nome rilassato). Necessita della variabile d'ambiente `SERPER_API_KEY`. Gratuito 2500 ricerche/mese. I risultati sono cachati in `data/verifica_cache.json` (formato v2 con timestamp).
 - **Residenza**: la distinzione è tra **prima casa** (`--residente`) e **seconda casa** (`--non-residente`), non tra residenza anagrafica in Italia/estero.
-- **Zone geografiche**: l'XML include il campo `ZoneOfferta` con restrizioni regionali (`REGIONE`, codici ISTAT 01-20) e provinciali (`PROVINCIA`). Le offerte con restrizioni geografiche sono escluse automaticamente quando si usa `--zona`. Senza `--zona` vengono mostrate tutte. Usa `--zona toscana` o `--zona 09` per vedere solo quelle disponibili in Toscana.
+- **Regioni**: l'XML include il campo `ZoneOfferta` con restrizioni regionali (`REGIONE`, codici ISTAT 01-20) e provinciali (`PROVINCIA`). Le offerte con restrizioni geografiche sono escluse automaticamente quando si usa `--regione`. Senza `--regione` vengono mostrate tutte. Usa `--regione toscana` o `--regione 09` per vedere solo quelle disponibili in Toscana.
 
 ---
 
