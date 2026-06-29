@@ -332,3 +332,5 @@ I dati sono proprietà del Portale Offerte luce e gas.
 ## Autore
 
 Creato per uso personale di confronto offerte energetiche.
+
+Sviluppato con [opencode](https://opencode.ai) e modelli DeepSeek V4 Flash e DeepSeek V4 Pro.
