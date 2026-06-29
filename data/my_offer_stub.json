@@ -6,7 +6,7 @@
   "nome_offerta": "Offerta X",
   "_note_tipo": "★ 'fisso' o 'variabile'",
   "tipo": "variabile",
-  "_note_tariffa": "★ 'monoraria', 'bioraria' o 'trifaria'",
+  "_note_tariffa": "★ 'monoraria', 'bioraria' o 'trioraria'",
   "tariffa": "monoraria",
   "_note_prezzo": "★ €/kWh. Se tipo=fisso è il prezzo fisso, se variabile è lo spread sul PUN",
   "prezzo_energia": 0.125,

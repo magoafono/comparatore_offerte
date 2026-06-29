@@ -41,7 +41,7 @@ MAPPING = {
     "tipologia_fasce": {
         "01": "monoraria",
         "02": "bioraria",
-        "03": "trifaria",
+        "03": "trioraria",
     },
     "limitante": {
         "01": True,   # limitante / trappola
@@ -92,7 +92,7 @@ PROFILO_CONSUMO = {
     "tutte": {"unica": 1.0},
     "monoraria": {"unica": 1.0},
     "bioraria": {"F1": 0.50, "F2": 0.50},
-    "trifaria": {"F1": 0.33, "F2": 0.31, "F3": 0.36},
+    "trioraria": {"F1": 0.33, "F2": 0.31, "F3": 0.36},
 }
 
 # Mappatura fasce componenti → nomi canonici

@@ -14,7 +14,7 @@ Utilizza i **dati aperti** (Open Data) aggiornati quotidianamente dal portale [i
 - **Filtri avanzati**:
   - Tipologia cliente (domestico / altri usi)
   - Tipologia offerta (prezzo fisso / variabile)
-  - Tipologia tariffa (**tutte** / monoraria / bioraria / trifaria)
+  - Tipologia tariffa (**tutte** / monoraria / bioraria / trioraria)
   - Tipo attivazione (**tutte** / nuova / cambio / voltura / subentro)
   - Range di consumo
   - Esclusione offerte con **condizioni limitanti** (vincoli, penali, obblighi socio, pannelli fotovoltaici, ecc.)
@@ -63,7 +63,7 @@ Accetta **shortcut** per le scelte testuali:
 | **tutte (tariffa)** | `0`, `a`, `all`, `tut` |
 | **monoraria** | `1`, `m`, `mono` |
 | **bioraria** | `2`, `b`, `bio` |
-| **trifaria** | `3`, `t`, `tri` |
+| **trioraria** | `3`, `t`, `tri` |
 | **tutte (prezzo)** | `0`, `a`, `all` |
 | **fisso** | `1`, `f` |
 | **variabile** | `2`, `v`, `var` |
@@ -94,10 +94,10 @@ python main.py --non-residente --consumo-annuo 100 --tipo-offerta fisso --tipo-a
 # Solo prezzo variabile, seconda casa, PUN custom
 python main.py --non-residente --consumo-annuo 2000 --tipo-offerta variabile --pun 0.12
 
-# Solo prezzo fisso, trifaria, escludi offerte complicate, esporta CSV
+# Solo prezzo fisso, trioraria, escludi offerte complicate, esporta CSV
 python main.py \
   --consumo-annuo 1500 \
-  --tipo-tariffa trifaria \
+  --tipo-tariffa trioraria \
   --tipo-offerta fisso \
   --senza-vincoli \
   --no-oneri-recesso \
@@ -149,7 +149,7 @@ python main.py \
 | `--non-residente` | Seconda casa / non residente | - |
 | `--consumo-annuo` | Consumo stimato in kWh/anno | *richiesto* |
 | `--potenza` | Potenza impegnata in kW | `3` |
-| `--tipo-tariffa` | `tutte` / `monoraria` / `bioraria` / `trifaria` | `tutte` |
+| `--tipo-tariffa` | `tutte` / `monoraria` / `bioraria` / `trioraria` | `tutte` |
 | `--tipo-offerta` | `tutte` / `fisso` / `variabile` | `tutte` |
 | `--tipo-attivazione` | `tutte` / `nuova` / `cambio` / `voltura` / `subentro` | `tutte` |
 | `--pun` | Valore PUN in €/kWh (sovrascrive l'ultimo mensile) | auto |
@@ -193,7 +193,7 @@ La tua offerta comparirà in fondo alla tabella con `★` e label "Attuale".
 | `venditore` | ★ | Nome visualizzato (es. `"Edison"`) |
 | `nome_offerta` | ★ | Nome offerta (es. `"EDISON DYNAMIC LUCE"`) |
 | `tipo` | ★ | `"fisso"` o `"variabile"` |
-| `tariffa` | ★ | `"monoraria"`, `"bioraria"` o `"trifaria"` |
+| `tariffa` | ★ | `"monoraria"`, `"bioraria"` o `"trioraria"` |
 | `prezzo_energia` | ★ | €/kWh. Spread sul PUN (variabile) o prezzo fisso. Se `scaglioni_energia` è presente, viene sovrascritto. |
 | `quota_fissa` | ★ | €/anno |
 | `quota_potenza` | ☆ | €/kW/anno (default 0) |
@@ -311,7 +311,7 @@ RISULTATI (1344 offerte trovate, prime 8 mostrate)
 1   CVA               CVA EASYFLEX (Sconto_Residenza 80€)      000784ESVFL04XXCVAEASYFLEXDRCASA Var            ? ?    ●    204.30       0.00
 2   SEL               Offerta Luce Sprint fasce                027095ESVFL02XXLUCESPRINTFASCEXX Var   Tri      ? ?    ●    212.91       7.06
 ...
-5   Polisenergia      KINETICA (trifaria, QF 72€, spread 0.0   017247ESVFL08XX00000KINETICA2026 Var   Tri      ✓ ✗    ●    247.54       35.44
+5   Polisenergia      KINETICA (trioraria, QF 72€, spread 0.0   017247ESVFL08XX00000KINETICA2026 Var   Tri      ✓ ✗    ●    247.54       35.44
 ...
 8   Sinergas          ALL DAY WEB LUCE                         000753ESFML06XXP0114PB3338260623 Fix   Mono     ✓ ✗    ●    265.00       49.75
 

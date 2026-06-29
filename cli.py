@@ -11,7 +11,7 @@ SHORTCUTS_TIPO_TARIFFA = {
     "0": "tutte", "a": "tutte", "all": "tutte", "tut": "tutte",
     "1": "monoraria", "m": "monoraria", "mono": "monoraria",
     "2": "bioraria", "b": "bioraria", "bio": "bioraria",
-    "3": "trifaria", "t": "trifaria", "tri": "trifaria",
+    "3": "trioraria", "t": "trioraria", "tri": "trioraria",
 }
 SHORTCUTS_TIPO_OFFERTA = {
     "0": "tutte", "a": "tutte", "all": "tutte",
@@ -108,7 +108,7 @@ Esempi:
     parser.add_argument("--consumo-annuo", type=int, help="Consumo annuo stimato in kWh")
     parser.add_argument("--potenza", type=float, default=3.0, help="Potenza impegnata in kW (default: 3)")
     parser.add_argument("--tipo-tariffa", default="tutte",
-                        choices=["tutte", "monoraria", "bioraria", "trifaria"],
+                        choices=["tutte", "monoraria", "bioraria", "trioraria"],
                         help="Tipologia tariffa (default: tutte)")
     parser.add_argument("--tipo-offerta", default="tutte",
                         choices=["tutte", "fisso", "variabile"],
@@ -228,8 +228,8 @@ def _modalita_interattiva(config: Dict[str, Any]) -> Dict[str, Any]:
 
     if config["tipo_tariffa"] is None:
         config["tipo_tariffa"] = _input_choice(
-            "Tipologia tariffa (0=tutte, 1=monoraria, 2=bioraria, 3=trifaria): ",
-            ["tutte", "monoraria", "bioraria", "trifaria"],
+            "Tipologia tariffa (0=tutte, 1=monoraria, 2=bioraria, 3=trioraria): ",
+            ["tutte", "monoraria", "bioraria", "trioraria"],
             shortcut_map=SHORTCUTS_TIPO_TARIFFA,
             default="tutte",
         )

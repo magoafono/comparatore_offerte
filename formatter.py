@@ -22,7 +22,7 @@ def _color(text: str, color: str) -> str:
 
 
 TIPO_MAP = {"fisso": "Fix", "variabile": "Var"}
-TARIFFA_MAP = {"monoraria": "Mono", "bioraria": "Bi", "trifaria": "Tri"}
+TARIFFA_MAP = {"monoraria": "Mono", "bioraria": "Bi", "trioraria": "Tri"}
 
 
 def _vislen(s: str) -> int:

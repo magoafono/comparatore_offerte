@@ -53,7 +53,7 @@ class Offerta:
     descrizione: str
     tipo_cliente: str  # domestico / altri_usi
     tipo_offerta: str  # fisso / variabile
-    tipologia_fasce: str  # monoraria / bioraria / trifaria
+    tipologia_fasce: str  # monoraria / bioraria / trioraria
     durata: str
     garanzie: str
     modalita_attivazione: str
