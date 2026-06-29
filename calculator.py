@@ -1,6 +1,6 @@
 """Calcolo della spesa annua stimata per ogni offerta."""
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from parser import Offerta, IntervalloPrezzo, Sconto
 from config import PROFILO_CONSUMO
 
@@ -56,22 +56,64 @@ def calcola_spesa_annua(
     costo_energia_venditore = 0.0
 
     for comp in offerta.componenti:
-        for intervallo in comp.prezzi:
-            if intervallo.unita_misura == "euro_anno":
-                costo_fisso_venditore += intervallo.prezzo
-            elif intervallo.unita_misura == "euro_kw_anno":
-                costo_potenza_venditore += intervallo.prezzo * potenza
-            elif intervallo.unita_misura == "euro_kwh":
-                # Distribuzione sulle fasce
+        has_scaglioni = any(
+            intervallo.consumo_da is not None
+            for intervallo in comp.prezzi
+        )
+
+        if has_scaglioni:
+            fasce = {}
+            for intervallo in comp.prezzi:
+                if intervallo.consumo_da is None:
+                    continue
                 fascia = intervallo.fascia
+                if fascia not in fasce:
+                    fasce[fascia] = []
+                fasce[fascia].append(intervallo)
+            for fascia in fasce:
+                fasce[fascia].sort(key=lambda x: x.consumo_da or 0)
+
+            for fascia, entries in fasce.items():
                 if fascia in profilo_fasce:
                     kwh_fascia = consumo_annuo * profilo_fasce[fascia]
                 elif fascia == "unica" or not fascia:
                     kwh_fascia = consumo_annuo
                 else:
-                    # Se fascia non riconosciuta, usa totale (fallback)
                     kwh_fascia = consumo_annuo
-                costo_energia_venditore += intervallo.prezzo * kwh_fascia
+
+                for e in entries:
+                    da = e.consumo_da or 0
+                    a = e.consumo_a
+
+                    if e.unita_misura == "euro_kwh":
+                        if kwh_fascia <= da:
+                            continue
+                        if a is not None:
+                            kwh_tier = min(kwh_fascia, a) - da
+                        else:
+                            kwh_tier = kwh_fascia - da
+                        costo_energia_venditore += e.prezzo * kwh_tier
+                    elif e.unita_misura == "euro_anno":
+                        if consumo_annuo >= da and (a is None or consumo_annuo <= a):
+                            costo_fisso_venditore += e.prezzo
+                    elif e.unita_misura == "euro_kw_anno":
+                        if consumo_annuo >= da and (a is None or consumo_annuo <= a):
+                            costo_potenza_venditore += e.prezzo * potenza
+        else:
+            for intervallo in comp.prezzi:
+                if intervallo.unita_misura == "euro_anno":
+                    costo_fisso_venditore += intervallo.prezzo
+                elif intervallo.unita_misura == "euro_kw_anno":
+                    costo_potenza_venditore += intervallo.prezzo * potenza
+                elif intervallo.unita_misura == "euro_kwh":
+                    fascia = intervallo.fascia
+                    if fascia in profilo_fasce:
+                        kwh_fascia = consumo_annuo * profilo_fasce[fascia]
+                    elif fascia == "unica" or not fascia:
+                        kwh_fascia = consumo_annuo
+                    else:
+                        kwh_fascia = consumo_annuo
+                    costo_energia_venditore += intervallo.prezzo * kwh_fascia
 
     # --- 2. PUN (solo per offerte a prezzo variabile) ---
     costo_pun = 0.0
@@ -223,6 +265,7 @@ def calcola_mia_offerta(
     from typing import List
 
     off_type = mia_offerta["tipo"]
+    perdite_rete = mia_offerta.get("perdite_rete", 0.0)
 
     # Crea un'offerta fake per riusare calcola_spesa_annua
     @dataclass
@@ -230,6 +273,8 @@ def calcola_mia_offerta(
         fascia: str
         prezzo: float
         unita_misura: str
+        consumo_da: Optional[int] = None
+        consumo_a: Optional[int] = None
 
     @dataclass
     class ComponenteFake:
@@ -272,7 +317,19 @@ def calcola_mia_offerta(
         componenti.append(ComponenteFake(prezzi=[
             IntervalloFake(fascia="unica", prezzo=quota_potenza, unita_misura="euro_kw_anno"),
         ]))
-    if mia_offerta["prezzo_energia"] > 0:
+    scaglioni_energia = mia_offerta.get("scaglioni_energia", None)
+    if scaglioni_energia:
+        prezzi = []
+        for s in scaglioni_energia:
+            prezzi.append(IntervalloFake(
+                fascia="unica",
+                prezzo=s["prezzo"],
+                unita_misura="euro_kwh",
+                consumo_da=s["da"],
+                consumo_a=s.get("a"),
+            ))
+        componenti.append(ComponenteFake(prezzi=prezzi))
+    elif mia_offerta["prezzo_energia"] > 0:
         componenti.append(ComponenteFake(prezzi=[
             IntervalloFake(fascia="unica", prezzo=mia_offerta["prezzo_energia"], unita_misura="euro_kwh"),
         ]))
@@ -292,8 +349,9 @@ def calcola_mia_offerta(
         condizioni=[],
     )
 
+    pun_effettivo = pun * (1 + perdite_rete)
     risultato = calcola_spesa_annua(
-        offerta_fake, parametri, consumo_annuo, potenza, pun, residente,
+        offerta_fake, parametri, consumo_annuo, potenza, pun_effettivo, residente,
         confronto_portale=confronto_portale,
         ignora_sconti_promo=ignora_sconti_promo,
     )

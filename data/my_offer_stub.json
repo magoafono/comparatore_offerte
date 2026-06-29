@@ -16,5 +16,9 @@
   "quota_potenza": 30.0,
   "_note_sconti": "☆ €/anno (valore negativo = risparmio, es. -10). Default 0",
   "sconti": 0.0,
+  "_note_perdite": "☆ Perdite di rete λ (es. 0.10 = +10% su PUN). Default 0",
+  "perdite_rete": 0.0,
+  "_note_scaglioni": "☆ Scaglioni consumo (opzionale, sovrascrive prezzo_energia). 'a' assente = infinito",
+  "_note_scaglioni_example": "  Esempio: \"scaglioni_energia\": [{\"da\": 0, \"a\": 2200, \"prezzo\": 0.021}, {\"da\": 2201, \"prezzo\": 0.0}]",
   "_nota": "I campi _note vengono ignorati dal programma. Modifica solo i valori."
 }

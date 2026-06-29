@@ -14,6 +14,8 @@ class IntervalloPrezzo:
     fascia: str
     prezzo: float
     unita_misura: str
+    consumo_da: Optional[int] = None
+    consumo_a: Optional[int] = None
 
 
 @dataclass
@@ -295,6 +297,16 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                     current_componente["prezzo"] = elem.text.strip() if elem.text else "0"
                 elif tag == "UNITA_MISURA":
                     current_componente["unita_misura"] = MAPPING["unita_misura"].get(elem.text.strip(), "")
+                elif tag == "CONSUMO_DA":
+                    try:
+                        current_componente["consumo_da"] = int(elem.text.strip())
+                    except (ValueError, TypeError):
+                        pass
+                elif tag == "CONSUMO_A":
+                    try:
+                        current_componente["consumo_a"] = int(elem.text.strip())
+                    except (ValueError, TypeError):
+                        pass
                 elif tag == "IntervalloPrezzi":
                     fascia = current_componente.get("fascia", "unica")
                     if "prezzo" in current_componente and "unita_misura" in current_componente:
@@ -306,9 +318,10 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                             fascia=FASCIA_MAP.get(fascia, fascia),
                             prezzo=prezzo_val,
                             unita_misura=current_componente["unita_misura"],
+                            consumo_da=current_componente.get("consumo_da"),
+                            consumo_a=current_componente.get("consumo_a"),
                         ))
-                    # reset temporanei
-                    for k in ("fascia", "prezzo", "unita_misura"):
+                    for k in ("fascia", "prezzo", "unita_misura", "consumo_da", "consumo_a"):
                         current_componente.pop(k, None)
 
             # Estrazione campi CondizioniContrattuali

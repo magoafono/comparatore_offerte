@@ -22,14 +22,14 @@ Utilizza i **dati aperti** (Open Data) aggiornati quotidianamente dal portale [i
   - Filtro per parole chiave nelle condizioni contrattuali
   - Filtro per venditore
   - Filtro per zona geografica (codice ISTAT o nome regione, es. `02` / `"valle d'aosta"`)
-  - **Verifica presenza sul sito venditore** via Google (Serper.dev, opzionale, colonna Check ✓/✗)
-  - **Colonna Confidenza** (● verde/giallo/rosso): segnala se gli sconti hanno durata certa o incerta
+   - **Verifica presenza sul sito venditore** via Google (Serper.dev, opzionale, colonna Check ✓/✗). Senza `--verifica`, la colonna è sempre visibile con `? ?` (giallo).
+   - **Colonna Confidenza** (● verde/giallo/rosso): segnala se gli sconti hanno durata certa o incerta
   - **Esclusione automatica** di offerte geolimitate con `--regione` se non compatibili con la regione specificata
 - **Calcolo spesa annua stimata**:
-  - Componenti del venditore (spread, quote fisse, quote potenza)
-  - PUN parametrico (ultimo mensile o valore custom)
-  - Oneri di sistema (accise, trasporto, distribuzione, ARIM, ASOS, ecc.)
-  - IVA applicata (10% prima casa, 22% seconda casa / altri usi)
+   - Componenti del venditore (spread, quote fisse, quote potenza, **scaglioni di consumo**)
+   - PUN parametrico (ultimo mensile o valore custom) con **perdite di rete** (λ) per la propria offerta
+   - Oneri di sistema (accise, trasporto, distribuzione, ARIM, ASOS, ecc.)
+   - IVA applicata (10% prima casa, 22% seconda casa / altri usi)
 - **Output doppio**: tabella a terminale + esportazione CSV
 - **Modalità interattiva** se si lancia senza argomenti
 
@@ -186,6 +186,21 @@ python main.py --consumo-annuo 1000 --tipo-offerta fisso --senza-vincoli --no-on
 La tua offerta comparirà in fondo alla tabella con `★` e label "Attuale".  
 `my_offer.json` è in `.gitignore` (dati personali), `my_offer_stub.json` è tracciato come template.
 
+#### Campi di `my_offer.json`
+
+| Campo | Obbligatorio | Descrizione |
+|---|---|---|
+| `venditore` | ★ | Nome visualizzato (es. `"Edison"`) |
+| `nome_offerta` | ★ | Nome offerta (es. `"EDISON DYNAMIC LUCE"`) |
+| `tipo` | ★ | `"fisso"` o `"variabile"` |
+| `tariffa` | ★ | `"monoraria"`, `"bioraria"` o `"trifaria"` |
+| `prezzo_energia` | ★ | €/kWh. Spread sul PUN (variabile) o prezzo fisso. Se `scaglioni_energia` è presente, viene sovrascritto. |
+| `quota_fissa` | ★ | €/anno |
+| `quota_potenza` | ☆ | €/kW/anno (default 0) |
+| `sconti` | ☆ | €/anno (negativo = risparmio, default 0) |
+| `perdite_rete` | ☆ | Moltiplicatore PUN (es. `0.10` = +10% sul PUN, default 0) |
+| `scaglioni_energia` | ☆ | Lista scaglioni consumo (opzionale). Es: `[{"da": 0, "a": 2200, "prezzo": 0.021}, {"da": 2201, "prezzo": 0.0}]`. `"a"` assente = infinito. Sostituisce `prezzo_energia`. |
+
 ---
 
 ### Verifica presenza sul sito venditore (`--verifica`)
@@ -273,6 +288,8 @@ comparatore_offerte/
 - **Sconti automatici**: il parser estrae e applica gli sconti senza condizioni (`CONDIZIONE_APPLICAZIONE=00`, es. sconti attivazione) dal XML. Gli sconti condizionali (fattura elettronica, SDD) non vengono applicati automaticamente.
 - **Sconti promozionali**: alcuni sconti hanno validità limitata (`VALIDITA=02`, es. "sconto primo mese", "sconto primi 6 mesi"). Usa `--ignora-sconti-promo` per escluderli dal calcolo annuale. Il flag ora rileva anche sconti `VALIDITA=01` con keyword promozionali nel nome/descrizione (es. "primo anno", "attivazione", "benvenuto", "nei primi", "una tantum") per compensare dati XML imprecisi.
 - **Colonna Confidenza** (`Conf`): ● verde = sconti con durata certa; ● giallo = sconti `VALIDITA=01` senza durata specificata nel XML (incertezza moderata); ● rosso = sconti `VALIDITA=01` con keyword promozionali e durata sconosciuta (probabile sconto temporaneo, il prezzo annuale potrebbe essere ottimista). La colonna è indipendente dal flag `--ignora-sconti-promo`.
+- **Colonna Check**: sempre visibile. Senza `--verifica` mostra `? ?` in giallo (non verificato). Con `--verifica` mostra ✓/✗ (trovato/non trovato) per codice offerta e nome offerta.
+- **Scaglioni di consumo**: l'XML può contenere componenti con fasce di consumo (`CONSUMO_DA`/`CONSUMO_A`) che applicano prezzi diversi a diverse soglie di kWh/anno (es. 0–2200 kWh a spread A, oltre 2200 a spread B). Il calcolatore supporta sia scaglioni su `euro_kwh` (ripartizione proporzionale) sia su `euro_anno` (selezione dell'unica fascia applicabile). Il formato `my_offer.json` supporta scaglioni via campo `scaglioni_energia`.
 - **Tipo attivazione**: ogni offerta nel XML specifica per quali tipi di attivazione è valida (nuova, cambio fornitore, voltura, subentro). Usa `--tipo-attivazione cambio` per vedere solo offerte per cambio fornitore (switching).
 - **Nomi venditori**: generati automaticamente dal dominio del sito web di ogni venditore. La mappa viene cachata in `data/venditori.json`. Se un nome non viene riconosciuto, viene mostrata la PIVA.
 - **Verifica offerte (`--verifica`)**: usa l'API Serper.dev per cercare il codice offerta e il nome offerta su Google. Per ogni offerta vengono fatte sempre **entrambe** le ricerche (codice esatto + nome rilassato). Necessita della variabile d'ambiente `SERPER_API_KEY`. Gratuito 2500 ricerche/mese. I risultati sono cachati in `data/verifica_cache.json` (formato v2 con timestamp).
@@ -291,8 +308,8 @@ RISULTATI (1344 offerte trovate, prime 8 mostrate)
 
 #   Venditore         Offerta                                  Cod.Offerta                      Tipo  Tariffa Check  Conf  Spesa Tot.   Spesa Vend.
 ---------------------------------------------------------------------------------------------------------------------------------------------------
-1   CVA               CVA EASYFLEX (Sconto_Residenza 80€)      000784ESVFL04XXCVAEASYFLEXDRCASA Var            ✗ ✗    ●    204.30       0.00
-2   SEL               Offerta Luce Sprint fasce                027095ESVFL02XXLUCESPRINTFASCEXX Var   Tri      ✗ ✗    ●    212.91       7.06
+1   CVA               CVA EASYFLEX (Sconto_Residenza 80€)      000784ESVFL04XXCVAEASYFLEXDRCASA Var            ? ?    ●    204.30       0.00
+2   SEL               Offerta Luce Sprint fasce                027095ESVFL02XXLUCESPRINTFASCEXX Var   Tri      ? ?    ●    212.91       7.06
 ...
 5   Polisenergia      KINETICA (trifaria, QF 72€, spread 0.0   017247ESVFL08XX00000KINETICA2026 Var   Tri      ✓ ✗    ●    247.54       35.44
 ...
