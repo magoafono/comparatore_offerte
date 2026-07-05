@@ -269,7 +269,7 @@ def _modalita_interattiva(config: Dict[str, Any]) -> Dict[str, Any]:
 
     if not config["no_oneri_recesso"]:
         config["no_oneri_recesso"] = _input_yesno(
-            "Escludere offerte con penali/oneri di recesso?", default=True
+            "Escludere offerte con penali/oneri di recesso?", default=False
         )
 
     if config["tipo_attivazione"] == "tutte":
