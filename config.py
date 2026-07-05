@@ -96,10 +96,15 @@ PROFILO_CONSUMO = {
 }
 
 # Mappatura fasce componenti → nomi canonici
+# 01/02/03 = F1/F2/F3 standard; 07/08 = codici non-standard usati da alcuni
+# venditori (sempre coppie 07+08 sul componente energia, 07 > 08 come prezzo):
+# inferenza 07→F1 (fascia di punta), 08→F2 (fascia fuori punta).
 FASCIA_MAP = {
     "01": "F1",
     "02": "F2",
     "03": "F3",
+    "07": "F1",
+    "08": "F2",
 }
 
 # Parole chiave default per escludere offerte "trappola" nelle condizioni

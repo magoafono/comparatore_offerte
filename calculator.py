@@ -48,7 +48,21 @@ def calcola_spesa_annua(
     Calcola la spesa annua stimata per un'offerta.
     Ritorna un dizionario con i dettagli del calcolo.
     """
-    profilo_fasce = PROFILO_CONSUMO.get(offerta.tipologia_fasce, PROFILO_CONSUMO["monoraria"])
+    if offerta.tipologia_fasce in PROFILO_CONSUMO:
+        profilo_fasce = PROFILO_CONSUMO[offerta.tipologia_fasce]
+    else:
+        # tipologia_fasce vuota o sconosciuta: inferisce dal componente energia
+        fasce_energia = set()
+        for comp in offerta.componenti:
+            for p in comp.prezzi:
+                if p.unita_misura == "euro_kwh" and p.prezzo > 0:
+                    fasce_energia.add(p.fascia)
+        if {"F1", "F2"} <= fasce_energia and "F3" not in fasce_energia:
+            profilo_fasce = PROFILO_CONSUMO["bioraria"]
+        elif {"F1", "F2", "F3"} <= fasce_energia:
+            profilo_fasce = PROFILO_CONSUMO["trioraria"]
+        else:
+            profilo_fasce = PROFILO_CONSUMO["monoraria"]
 
     # --- 1. Componenti venditore ---
     costo_fisso_venditore = 0.0
@@ -135,6 +149,16 @@ def calcola_spesa_annua(
                 sconti_totali += p.prezzo
             elif p.unita_misura == "euro_kwh":
                 sconti_totali += p.prezzo * consumo_annuo
+            elif p.unita_misura == "":
+                # um mancante nell'XML: euristica sul nome
+                nome = sc.nome.lower().strip()
+                if nome.startswith("sconto f") and len(nome) == 9 and nome[-1] in "123":
+                    fascia = f"F{nome[-1]}"
+                    kwh_fascia = consumo_annuo * profilo_fasce.get(fascia, 1.0)
+                    sconti_totali += p.prezzo * kwh_fascia
+                else:
+                    # default: importo fisso annuo
+                    sconti_totali += p.prezzo
     spesa_venditore = max(0.0, spesa_venditore - sconti_totali)
 
     confidenza = _calcola_confidenza(offerta)
