@@ -154,7 +154,7 @@ python main.py \
 | `--tipo-attivazione` | `tutte` / `nuova` / `cambio` / `voltura` / `subentro` | `tutte` |
 | `--pun` | Valore PUN in €/kWh (sovrascrive l'ultimo mensile) | auto |
 | `--senza-vincoli` | Esclude offerte con condizioni limitanti (`LIMITANTE=01`: vincoli, obblighi, requisiti particolari) | - |
-| `--no-oneri-recesso` | Esclude offerte con oneri di recesso (`LIMITANTE=01` come il portale) | - |
+| `--no-oneri-recesso` | Esclude **tutte** le offerte con penali di recesso (condizioni `tipologia=05`), sia `limitante` che `non limitante` | - |
 | `--confronto-portale` | Esclude costi fissi identici (sigma1/sigma2) per allinearsi al portale ARERA | - |
 | `--escludi-parole` | Esclude offerte con queste parole nelle condizioni contrattuali. Lista separata da virgola. Es: `--escludi-parole "fotovoltaico, pannelli"` | - |
 | `--filtra-venditori` | Mostra **solo** le offerte dei venditori con queste PIVA (separate da virgola). Es: `--filtra-venditori 01877220366,001046` | - |
@@ -289,6 +289,7 @@ comparatore_offerte/
 - **Sconti promozionali**: alcuni sconti hanno validità limitata (`VALIDITA=02`, es. "sconto primo mese", "sconto primi 6 mesi"). Usa `--ignora-sconti-promo` per escluderli dal calcolo annuale. Il flag ora rileva anche sconti `VALIDITA=01` con keyword promozionali nel nome/descrizione (es. "primo anno", "attivazione", "benvenuto", "nei primi", "una tantum") per compensare dati XML imprecisi.
 - **Colonna Confidenza** (`Conf`): ● verde = sconti con durata certa; ● giallo = sconti `VALIDITA=01` senza durata specificata nel XML (incertezza moderata); ● rosso = sconti `VALIDITA=01` con keyword promozionali e durata sconosciuta (probabile sconto temporaneo, il prezzo annuale potrebbe essere ottimista). La colonna è indipendente dal flag `--ignora-sconti-promo`.
 - **Colonna Check**: sempre visibile. Senza `--verifica` mostra `? ?` in giallo (non verificato). Con `--verifica` mostra ✓/✗ (trovato/non trovato) per codice offerta e nome offerta.
+- **Colonna Pen**: indica la presenza di penali di recesso (`tipologia=05`). ⚠ giallo = penale non limitante; ⚠ rosso = penale limitante (già escluse da `--senza-vincoli`). Vuoto = nessuna penale. Filtra con `--no-oneri-recesso`.
 - **Scaglioni di consumo**: l'XML può contenere componenti con fasce di consumo (`CONSUMO_DA`/`CONSUMO_A`) che applicano prezzi diversi a diverse soglie di kWh/anno (es. 0–2200 kWh a spread A, oltre 2200 a spread B). Il calcolatore supporta sia scaglioni su `euro_kwh` (ripartizione proporzionale) sia su `euro_anno` (selezione dell'unica fascia applicabile). Il formato `my_offer.json` supporta scaglioni via campo `scaglioni_energia`.
 - **Tipo attivazione**: ogni offerta nel XML specifica per quali tipi di attivazione è valida (nuova, cambio fornitore, voltura, subentro). Usa `--tipo-attivazione cambio` per vedere solo offerte per cambio fornitore (switching).
 - **Nomi venditori**: generati automaticamente dal dominio del sito web di ogni venditore. La mappa viene cachata in `data/venditori.json`. Se un nome non viene riconosciuto, viene mostrata la PIVA.
@@ -306,14 +307,15 @@ RISULTATI (1344 offerte trovate, prime 8 mostrate)
    PUN: 0.1434 €/kWh
    Oneri fissi sistema: 155.53 €/anno | Oneri energia: 11.93 €/anno
 
-#   Venditore         Offerta                                  Cod.Offerta                      Tipo  Tariffa Check  Conf  Spesa Tot.   Spesa Vend.
----------------------------------------------------------------------------------------------------------------------------------------------------
-1   CVA               CVA EASYFLEX (Sconto_Residenza 80€)      000784ESVFL04XXCVAEASYFLEXDRCASA Var            ? ?    ●    204.30       0.00
-2   SEL               Offerta Luce Sprint fasce                027095ESVFL02XXLUCESPRINTFASCEXX Var   Tri      ? ?    ●    212.91       7.06
+#   Venditore         Offerta                                  Cod.Offerta                      Tipo  Tariffa Pen   Check  Conf  Spesa Tot.   Spesa Vend.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+1   CVA               CVA EASYFLEX (Sconto_Residenza 80€)      000784ESVFL04XXCVAEASYFLEXDRCASA Var                  ? ?    ●    204.30       0.00
+2   SEL               Offerta Luce Sprint fasce                027095ESVFL02XXLUCESPRINTFASCEXX Var   Tri            ? ?    ●    212.91       7.06
 ...
 5   Polisenergia      KINETICA (trioraria, QF 72€, spread 0.0   017247ESVFL08XX00000KINETICA2026 Var   Tri      ✓ ✗    ●    247.54       35.44
 ...
 8   Sinergas          ALL DAY WEB LUCE                         000753ESFML06XXP0114PB3338260623 Fix   Mono     ✓ ✗    ●    265.00       49.75
+
 
 Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).
 PUN usato: 0.1434 €/kWh. Usa --pun per cambiarlo.

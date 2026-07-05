@@ -8,6 +8,7 @@ from config import DATA_DIR, PROFILO_CONSUMO, carica_mia_offerta
 from downloader import ottieni_file_open_data
 from parser import parse_xml_offerte, parse_csv_parametri, parse_csv_prezzi
 from filters import FiltroOfferte
+from parser import has_penale_recesso, has_penale_recesso_limitante
 from calculator import calcola_spesa_annua, calcola_mia_offerta, applica_iva
 from formatter import stampa_tabella, esporta_csv
 from cli import parse_args
@@ -160,6 +161,8 @@ def main():
         iva = round(spesa_totale_iva - dettagli["spesa_totale"], 2)
 
         condizioni_limitanti = any(c.limitante for c in offerta.condizioni)
+        ha_penali = has_penale_recesso(offerta)
+        penali_limitante = has_penale_recesso_limitante(offerta)
         descrizione_condizioni = " | ".join(
             c.descrizione for c in offerta.condizioni
         )
@@ -183,6 +186,8 @@ def main():
             "pun_usato": dettagli["pun_usato"],
             "url_offerta": offerta.url_offerta,
             "condizioni_limitanti": condizioni_limitanti,
+            "ha_penali": ha_penali,
+            "penali_limitante": penali_limitante,
             "descrizione_condizioni": descrizione_condizioni,
             "confidenza": dettagli["confidenza"],
         })
@@ -217,6 +222,8 @@ def main():
                 "pun_usato": dettagli["pun_usato"],
                 "url_offerta": "",
                 "condizioni_limitanti": False,
+                "ha_penali": False,
+                "penali_limitante": False,
                 "descrizione_condizioni": "",
                 "confidenza": dettagli.get("confidenza", "green"),
             })

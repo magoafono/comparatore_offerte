@@ -2,7 +2,7 @@
 
 import fnmatch
 from typing import List, Callable
-from parser import Offerta
+from parser import Offerta, has_penale_recesso
 from config import BLACKLIST_CONDIZIONI_DEFAULT, REGIONI_MAP
 
 
@@ -71,10 +71,8 @@ class FiltroOfferte:
     def by_no_oneri_recesso(self, attivo: bool) -> "FiltroOfferte":
         if not attivo:
             return self
-        # Il sito esclude tutte le offerte con condizioni limitanti (LIMITANTE=01)
-        # quando l'utente seleziona "Escludi oneri di recesso"
         return self.filtra(
-            lambda o: not any(c.limitante for c in o.condizioni)
+            lambda o: not has_penale_recesso(o)
         )
 
     def by_esclude_condizioni_keyword(self, keywords: List[str]) -> "FiltroOfferte":

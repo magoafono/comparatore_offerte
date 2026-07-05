@@ -74,6 +74,14 @@ class Offerta:
     sconti: List[Sconto] = field(default_factory=list)
 
 
+def has_penale_recesso(off: Offerta) -> bool:
+    return any(c.tipologia == "05" for c in off.condizioni)
+
+
+def has_penale_recesso_limitante(off: Offerta) -> bool:
+    return any(c.tipologia == "05" and c.limitante for c in off.condizioni)
+
+
 def _text(elem, tag, default=""):
     child = elem.find(tag)
     return child.text.strip() if child is not None and child.text else default
