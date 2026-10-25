@@ -24,6 +24,14 @@ data/my_offer.json
 
 # Cache verifica Serper
 data/verifica_cache.json
+data/verifica_urls.json
+
+# Database locale (ricostruibile con --popola-db)
+data/offerte.db
+data/offerte_gas.db
+
+# Variabili d'ambiente locali
+.env
 
 # my_offer_stub.json è tracciato (template per utente)
 
@@ -45,3 +53,10 @@ Thumbs.db
 
 # Log
 *.log
+
+# Override manuali penali (dati personali/CTE)
+data/penali_manuali.json
+data/penali_report.csv
+
+# Mia offerta gas (configurazione utente)
+data/my_offer_gas.json

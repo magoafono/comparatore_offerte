@@ -29,8 +29,10 @@ def _vislen(s: str) -> int:
     return len(re.sub(r"\033\[[0-9;]*m", "", s))
 
 
-def stampa_tabella(risultati: List[Dict], limite: int = 50):
+def stampa_tabella(risultati: List[Dict], limite: int = 50, commodity: str = "elettrico"):
     """Stampa una tabella formattata a terminale."""
+    indice = "PSV" if commodity == "gas" else "PUN"
+    unita = "Smc" if commodity == "gas" else "kWh"
     if not risultati:
         print(_color("Nessuna offerta trovata con i filtri specificati.", "yellow"))
         return
@@ -45,8 +47,12 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
     pun_usato = r0.get("pun_usato", 0)
     on_fissi = r0.get("oneri_fissi_sistema", 0)
     on_en = r0.get("oneri_energia_sistema", 0)
+    perdite = next((r.get("perdite_rete", 0) for r in risultati if r.get("perdite_rete")), 0)
     print(f"\n{_color('RISULTATI', 'bold')} ({totali} offerte trovate, prime {mostra} mostrate)\n")
-    print(f"   PUN: {pun_usato:.4f} €/kWh")
+    if perdite:
+        print(f"   {indice}: {pun_usato:.4f} €/{unita} (+{perdite * 100:.0f}% perdite di rete sulle offerte variabili)")
+    else:
+        print(f"   {indice}: {pun_usato:.4f} €/{unita}")
     print(f"   Oneri fissi sistema: {on_fissi:.2f} €/anno | Oneri energia: {on_en:.2f} €/anno\n")
 
     # Header
@@ -140,7 +146,7 @@ def stampa_tabella(risultati: List[Dict], limite: int = 50):
         print(row)
 
     print("\n" + _color("Nota: gli importi sono stimati (IVA inclusa in Spesa Tot.).", "yellow"))
-    print(_color("PUN usato: {:.4f} €/kWh. Usa --pun per cambiarlo.".format(
+    print(_color(f"{indice} usato: {{:.4f}} €/{unita}. Usa --{indice.lower()} per cambiarlo.".format(
         risultati[0].get("pun_usato", 0) if risultati else 0), "cyan"))
 
 
@@ -156,7 +162,7 @@ def esporta_csv(risultati: List[Dict], output_path: Path):
         "spesa_totale", "spesa_venditore",
         "costo_fisso_venditore", "costo_potenza_venditore",
         "costo_energia_venditore", "costo_pun", "oneri_fissi_sistema",
-        "oneri_energia_sistema", "iva", "pun_usato", "url_offerta",
+        "oneri_energia_sistema", "accise", "iva", "pun_usato", "url_offerta",
         "condizioni_limitanti", "descrizione_condizioni",
     ]
 

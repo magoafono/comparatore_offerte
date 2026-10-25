@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from config import DATA_DIR
 
 CACHE_PATH = DATA_DIR / "verifica_cache.json"
+URLS_CACHE_PATH = DATA_DIR / "verifica_urls.json"
 ENV_KEY = "SERPER_API_KEY"
 
 VERIFIED = "✓"
@@ -51,7 +52,23 @@ def _salva_cache(cache: Dict[str, dict]):
         json.dump(cache, f, indent=2)
 
 
-def _cerca_query_serper(termine: str, dominio: str, api_key: str, exact: bool = True) -> str:
+def _carica_urls_cache() -> Dict[str, dict]:
+    if not URLS_CACHE_PATH.exists():
+        return {}
+    try:
+        with open(URLS_CACHE_PATH) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _salva_urls_cache(cache: Dict[str, dict]):
+    URLS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(URLS_CACHE_PATH, "w") as f:
+        json.dump(cache, f, indent=2, ensure_ascii=False)
+
+
+def _cerca_query_serper(termine: str, dominio: str, api_key: str, exact: bool = True) -> Tuple[str, Optional[str]]:
     if exact:
         query = f'"{termine}" site:{dominio}'
     else:
@@ -69,28 +86,28 @@ def _cerca_query_serper(termine: str, dominio: str, api_key: str, exact: bool = 
         data = res.read().decode()
         conn.close()
     except Exception:
-        return ERROR
+        return ERROR, None
 
     try:
         results = json.loads(data)
     except json.JSONDecodeError:
-        return ERROR
+        return ERROR, None
 
     for item in results.get("organic", []):
         link = item.get("link", "")
         if dominio not in link:
             continue
         if termine in link or termine in item.get("title", "") or termine in item.get("snippet", ""):
-            return VERIFIED
-    return NOT_FOUND
+            return VERIFIED, link
+    return NOT_FOUND, None
 
 
-def _cerca_serper(cod_offerta: str, nome_offerta: str, dominio: str, api_key: str) -> Tuple[str, str, int]:
-    stato_cod = _cerca_query_serper(cod_offerta, dominio, api_key, exact=True)
+def _cerca_serper(cod_offerta: str, nome_offerta: str, dominio: str, api_key: str) -> Tuple[str, Optional[str], str, Optional[str], int]:
+    stato_cod, url_cod = _cerca_query_serper(cod_offerta, dominio, api_key, exact=True)
     if nome_offerta:
-        stato_nome = _cerca_query_serper(nome_offerta, dominio, api_key, exact=False)
-        return stato_cod, stato_nome, 2
-    return stato_cod, NO_CHECK, 1
+        stato_nome, url_nome = _cerca_query_serper(nome_offerta, dominio, api_key, exact=False)
+        return stato_cod, url_cod, stato_nome, url_nome, 2
+    return stato_cod, url_cod, NO_CHECK, None, 1
 
 
 def _estrai_dominio(url_offerta: str) -> Optional[str]:
@@ -134,18 +151,28 @@ def verifica_offerte(
     offerte: list,
     limite: int = 50,
     max_workers: int = 3,
+    offset: int = 0,
 ) -> Tuple[Dict[str, str], int]:
     api_key = os.environ.get(ENV_KEY)
     if not api_key:
-        print(f"   ⚠️  Imposta la variabile d'ambiente {ENV_KEY} per usare --verifica")
+        print(f"   ❌ {ENV_KEY} non trovata. Puoi impostarla con:")
+        print(f"      export {ENV_KEY}='tua_chiave'")
+        print(f"   oppure aggiungila al file .env:")
+        print(f"      {ENV_KEY}=tua_chiave")
         return {}, 0
 
     cache = _carica_cache()
+    urls_cache = _carica_urls_cache()
     da_verificare = []
+    offerta_info = {}
     risultati = {}
     now_ts = datetime.now(timezone.utc).isoformat()
+    skippati = 0
 
     for r in offerte:
+        if skippati < offset:
+            skippati += 1
+            continue
         if r.get("_mia"):
             continue
         cod = r.get("cod_offerta", "")
@@ -166,12 +193,14 @@ def verifica_offerte(
             continue
 
         nome = r.get("nome_offerta", "")
+        offerta_info[cod] = r
         if entry is not None and entry.get("cod") is not None and entry.get("nome") is None:
             da_verificare.append((cod, nome, dominio, True))
         else:
             da_verificare.append((cod, nome, dominio, False))
 
     if not da_verificare:
+        _salva_urls_cache(urls_cache)
         return risultati, 0
 
     aggiornati = 0
@@ -187,22 +216,35 @@ def verifica_offerte(
 
         for futuro in as_completed(futuri):
             cod, mode = futuri[futuro]
+            r = offerta_info[cod]
             if mode == "nome_only":
-                stato_nome = futuro.result()
+                stato_nome, url_nome = futuro.result()
                 entry = cache.get(cod, {})
                 stato_cod = entry.get("cod", NO_CHECK)
+                url_cod = entry.get("url_cod")
                 risultati[cod] = f"{stato_cod} {stato_nome}"
-                cache[cod] = {"cod": stato_cod, "nome": stato_nome, "ts": now_ts}
+                cache[cod] = {"cod": stato_cod, "url_cod": url_cod, "nome": stato_nome, "url_nome": url_nome, "ts": now_ts}
                 credito_speso += 1
             else:
-                stato_cod, stato_nome, chiamate = futuro.result()
+                stato_cod, url_cod, stato_nome, url_nome, chiamate = futuro.result()
                 risultati[cod] = f"{stato_cod} {stato_nome}"
-                cache[cod] = {"cod": stato_cod, "nome": stato_nome, "ts": now_ts}
+                cache[cod] = {"cod": stato_cod, "url_cod": url_cod, "nome": stato_nome, "url_nome": url_nome, "ts": now_ts}
                 credito_speso += chiamate
 
+            urls_cache[cod] = {
+                "cod": stato_cod,
+                "url_cod": url_cod,
+                "nome": stato_nome,
+                "url_nome": url_nome,
+                "nome_offerta": r.get("nome_offerta", ""),
+                "venditore": r.get("nome_venditore") or r.get("venditore", ""),
+                "ts": now_ts,
+            }
             aggiornati += 1
             if aggiornati % 10 == 0:
                 _salva_cache(cache)
+                _salva_urls_cache(urls_cache)
 
     _salva_cache(cache)
+    _salva_urls_cache(urls_cache)
     return risultati, credito_speso

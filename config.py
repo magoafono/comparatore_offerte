@@ -52,6 +52,8 @@ MAPPING = {
         "02": "euro_kw_anno",
         "03": "euro_kwh",
         "04": "percentuale",
+        "05": "euro_una_tantum",
+        "06": "percentuale",
     },
     "tipologia_att_contr": {
         "01": "nuova",
@@ -59,6 +61,17 @@ MAPPING = {
         "03": "voltura",
         "04": "subentro",
         "99": "altro",
+    },
+}
+
+# Mappatura unità di misura specifica per il gas.
+# Nel XML gas: 04 = €/Smc (nell'elettrico 04 = percentuale).
+MAPPING_GAS = {
+    "unita_misura": {
+        "01": "euro_anno",
+        "04": "euro_smc",
+        "05": "euro_una_tantum",
+        "06": "percentuale",
     },
 }
 
@@ -84,6 +97,18 @@ REGIONI_MAP = {
     "18": "calabria",
     "19": "sicilia",
     "20": "sardegna",
+}
+
+# Ambiti di distribuzione gas (a1..a6) per regione ISTAT.
+# a1 NORD-OCCIDENTALE, a2 NORD-ORIENTALE, a3 CENTRALE,
+# a4 SUD-ORIENTALE, a5 SUD-OCCIDENTALE, a6 MERIDIONALE.
+REGIONI_AMBITO_GAS = {
+    "01": "a1", "02": "a1", "03": "a1", "07": "a1",
+    "04": "a2", "05": "a2", "06": "a2", "08": "a2",
+    "09": "a3", "10": "a3", "11": "a3", "12": "a3",
+    "13": "a4", "14": "a4", "16": "a4", "17": "a4",
+    "15": "a5", "18": "a5",
+    "19": "a6", "20": "a6",
 }
 
 # Profili di consumo standard (percentuali per fascia)
@@ -160,31 +185,39 @@ PROFILI_PARAMETRI = {
 # --- Mia offerta (confronto) ---
 MY_OFFER_STUB_PATH = DATA_DIR / "my_offer_stub.json"
 MY_OFFER_PATH = DATA_DIR / "my_offer.json"
+MY_OFFER_GAS_STUB_PATH = DATA_DIR / "my_offer_gas_stub.json"
+MY_OFFER_GAS_PATH = DATA_DIR / "my_offer_gas.json"
 
 # Campi obbligatori per my_offer.json
 MY_OFFER_REQUIRED = {"venditore", "nome_offerta", "tipo", "tariffa", "prezzo_energia", "quota_fissa"}
 
-def carica_mia_offerta() -> Optional[Dict[str, Any]]:
-    """Carica la mia offerta da my_offer.json. Ritorna None se non esiste."""
-    if not MY_OFFER_PATH.exists():
-        if MY_OFFER_STUB_PATH.exists():
-            print(f"⚠️  Crea data/my_offer.json copiando da data/my_offer_stub.json e inserisci i tuoi dati.")
+def carica_mia_offerta(commodity: str = "elettrico") -> Optional[Dict[str, Any]]:
+    """Carica la mia offerta da my_offer.json (o my_offer_gas.json)."""
+    if commodity == "gas":
+        path, stub = MY_OFFER_GAS_PATH, MY_OFFER_GAS_STUB_PATH
+    else:
+        path, stub = MY_OFFER_PATH, MY_OFFER_STUB_PATH
+
+    if not path.exists():
+        if stub.exists():
+            print(f"⚠️  Crea {path.name} copiando da {stub.name} e inserisci i tuoi dati.")
         return None
     try:
-        with open(MY_OFFER_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         # Filtra chiavi _note
         data = {k: v for k, v in data.items() if not k.startswith("_")}
         # Verifica campi obbligatori
         mancanti = MY_OFFER_REQUIRED - set(data.keys())
         if mancanti:
-            print(f"⚠️  my_offer.json: campi mancanti: {', '.join(sorted(mancanti))}")
-            print(f"   Usa data/my_offer_stub.json come modello.")
+            print(f"⚠️  {path.name}: campi mancanti: {', '.join(sorted(mancanti))}")
+            print(f"   Usa {stub.name} come modello.")
             return None
         # Default per opzionali
         data.setdefault("quota_potenza", 0.0)
+        data.setdefault("altri_costi", 0.0)
         data.setdefault("sconti", 0.0)
         return data
     except (json.JSONDecodeError, IOError) as e:
-        print(f"⚠️  Errore lettura my_offer.json: {e}")
+        print(f"⚠️  Errore lettura {path.name}: {e}")
         return None

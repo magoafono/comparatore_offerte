@@ -1,12 +1,13 @@
 """Parsing dei file XML offerte e CSV parametri/prezzi."""
 
 import csv
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Optional
 
-from config import MAPPING, FASCIA_MAP
+from config import MAPPING, MAPPING_GAS, FASCIA_MAP
 
 
 @dataclass
@@ -74,12 +75,32 @@ class Offerta:
     sconti: List[Sconto] = field(default_factory=list)
 
 
+# Dichiarazioni esplicite di assenza di penali: non devono essere escluse
+# da --no-oneri-recesso. Se c'è un importo esplicito, la dichiarazione non vale.
+_NO_PENALE_RE = re.compile(
+    r"non applica alcun onere|non ne prevede|non sono previsti oneri|"
+    r"nessuna penale|senza oneri|non prevede alcun onere",
+    re.I,
+)
+_IMPORTO_RE = re.compile(r"\d+[.,]?\d*\s*€")
+
+
+def _is_dichiarazione_no_penale(cond) -> bool:
+    testo = cond.descrizione or ""
+    if _IMPORTO_RE.search(testo):
+        return False
+    return bool(_NO_PENALE_RE.search(testo))
+
+
 def has_penale_recesso(off: Offerta) -> bool:
-    return any(c.tipologia == "05" for c in off.condizioni)
+    return any(c.tipologia == "05" and not _is_dichiarazione_no_penale(c) for c in off.condizioni)
 
 
 def has_penale_recesso_limitante(off: Offerta) -> bool:
-    return any(c.tipologia == "05" and c.limitante for c in off.condizioni)
+    return any(
+        c.tipologia == "05" and c.limitante and not _is_dichiarazione_no_penale(c)
+        for c in off.condizioni
+    )
 
 
 def _text(elem, tag, default=""):
@@ -95,9 +116,10 @@ def _int_text(elem, tag, default=None):
         return default
 
 
-def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
+def parse_xml_offerte(xml_path: Path, commodity: str = "elettrico") -> List[Offerta]:
     """Parsa il file XML delle offerte usando iterparse per gestire file grandi."""
     offerte = []
+    unit_map = MAPPING_GAS["unita_misura"] if commodity == "gas" else MAPPING["unita_misura"]
     ns = {"ns": "http://www.acquirenteunico.it/schemas/SII_AU/OffertaRetail/01"}
 
     context = ET.iterparse(str(xml_path), events=("start", "end"))
@@ -217,7 +239,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                 elif tag == "PREZZO":
                     current_sconto["prezzo"] = elem.text.strip() if elem.text else "0"
                 elif tag == "UNITA_MISURA":
-                    current_sconto["unita_misura"] = MAPPING["unita_misura"].get(elem.text.strip(), "")
+                    current_sconto["unita_misura"] = unit_map.get(elem.text.strip(), "")
                 elif tag == "PrezziSconto":
                     if "prezzo" in current_sconto and "unita_misura" in current_sconto:
                         try:
@@ -304,7 +326,7 @@ def parse_xml_offerte(xml_path: Path) -> List[Offerta]:
                 elif tag == "PREZZO":
                     current_componente["prezzo"] = elem.text.strip() if elem.text else "0"
                 elif tag == "UNITA_MISURA":
-                    current_componente["unita_misura"] = MAPPING["unita_misura"].get(elem.text.strip(), "")
+                    current_componente["unita_misura"] = unit_map.get(elem.text.strip(), "")
                 elif tag == "CONSUMO_DA":
                     try:
                         current_componente["consumo_da"] = int(elem.text.strip())
@@ -366,9 +388,9 @@ def parse_csv_parametri(csv_path: Path) -> Dict[str, float]:
 def parse_csv_prezzi(prezzi_path: Path) -> Dict[str, float]:
     """
     Parsa il CSV dei prezzi storici.
-    Ritorna un dizionario con l'ultimo valore disponibile per ogni indicatore.
+    Ritorna un dizionario con l'ultimo valore disponibile per PUN, PSV e CMEM.
     """
-    ultimo_pun = None
+    indicatori = {"PUN": None, "PSV": None, "CMEM": None}
     # Prova encoding utf-8, fallback su latin-1 (il CSV del portale usa € in cp1252)
     for enc in ("utf-8", "latin-1"):
         try:
@@ -377,15 +399,41 @@ def parse_csv_prezzi(prezzi_path: Path) -> Dict[str, float]:
                 header = next(reader, None)
                 if not header:
                     return {}
+                indici = {}
+                for nome in indicatori:
+                    for i, colonna in enumerate(header):
+                        if colonna.strip().upper().startswith(nome):
+                            indici[nome] = i
+                            break
                 for row in reader:
-                    if len(row) >= 2:
-                        anno_mese = row[0].strip()
-                        pun_str = row[1].strip().replace(",", ".")
+                    for nome, i in indici.items():
+                        if len(row) <= i:
+                            continue
+                        valore = row[i].strip().replace(",", ".")
                         try:
-                            ultimo_pun = float(pun_str)
+                            indicatori[nome] = float(valore)
                         except ValueError:
                             continue
             break
         except UnicodeDecodeError:
             continue
-    return {"PUN": ultimo_pun} if ultimo_pun is not None else {}
+    return {k: v for k, v in indicatori.items() if v is not None}
+
+
+def ultimo_mese_prezzi(prezzi_path: Path) -> Optional[str]:
+    """Ritorna l'ultimo AnnoMese (YYYYMM) presente nel CSV dei prezzi storici."""
+    for enc in ("utf-8", "latin-1"):
+        try:
+            with open(prezzi_path, "r", encoding=enc) as f:
+                reader = csv.reader(f, delimiter=";")
+                next(reader, None)
+                ultimo = None
+                for row in reader:
+                    if len(row) >= 2:
+                        anno_mese = row[0].strip()
+                        if len(anno_mese) == 6 and anno_mese.isdigit():
+                            ultimo = anno_mese
+                return ultimo
+        except UnicodeDecodeError:
+            continue
+    return None

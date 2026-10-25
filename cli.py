@@ -1,6 +1,7 @@
 """Interfaccia a riga di comando con argparse e fallback interattivo."""
 
 import argparse
+import os
 import sys
 from typing import Dict, Any
 
@@ -113,7 +114,8 @@ Esempi:
     parser.add_argument("--tipo-offerta", default="tutte",
                         choices=["tutte", "fisso", "variabile"],
                         help="Tipo prezzo (default: tutte)")
-    parser.add_argument("--pun", type=float, help="Valore PUN in €/kWh (default: ultimo mensile)")
+    parser.add_argument("--pun", type=float, help="Valore PUN in €/kWh per l'elettrico (default: ultimo mensile)")
+    parser.add_argument("--psv", type=float, help="Valore PSV in €/Smc per il gas (default: ultimo mensile)")
     parser.add_argument("--escludi-parole", type=str, default="",
                         help="Esclude offerte le cui condizioni contengono queste parole "
                              "(separate da virgola, es: --escludi-parole 'fotovoltaico, pannelli')")
@@ -122,6 +124,12 @@ Esempi:
                              "vincoli, obblighi, requisiti particolari)")
     parser.add_argument("--no-oneri-recesso", action="store_true",
                         help="Escludi offerte con penali/oneri di recesso")
+    parser.add_argument("--penale-mese-max", type=float, default=None,
+                        help="Escludi offerte con penale di recesso superiore a X €/mese residuo. "
+                             "Le penali non quantificabili nell'XML vengono escluse con un avviso.")
+    parser.add_argument("--penale-12m-max", type=float, default=None,
+                        help="Escludi offerte con penale massima a 12 mesi superiore a Y € "
+                             "(cap esplicito o €/mese × mesi residui).")
     parser.add_argument("--filtra-venditori", type=str, default="",
                         help="Mostra solo le offerte dei venditori con queste PIVA "
                              "(separate da virgola, es: --filtra-venditori 01877220366,001046)")
@@ -144,6 +152,10 @@ Esempi:
                         help="Numero massimo di offerte da mostrare (default: 50)")
     parser.add_argument("--ignora-sconti-promo", action="store_true",
                         help="Ignora sconti promozionali (validità limitata) nel calcolo annuale")
+    parser.add_argument("--sconti-condizionati", action="store_true",
+                        help="Applica gli sconti condizionati di pagamento/fatturazione "
+                             "(SDD/domiciliazione, fattura elettronica, dematerializzazione): "
+                             "assume che le condizioni siano soddisfatte")
     parser.add_argument("--regione", type=str, default="",
                         help="Filtra per regione (codice ISTAT a 2 cifre o nome). "
                              "Es: --regione toscana o --regione 09. "
@@ -153,12 +165,51 @@ Esempi:
                         help="Verifica presenza offerte sul sito venditore via Google (Serper.dev). "
                              "'normal' = colonna Check; 'strict' = solo offerte verificate. "
                              "Richiede SERPER_API_KEY.")
+    parser.add_argument("--popola-db", action="store_true",
+                        help="Scarica i dati aperti, parsa il file XML e popola/aggiorna il database SQLite. "
+                             "Estrae le feature testuali con euristica rule-based (veloce, nessun LLM).")
+    parser.add_argument("--db-path", type=str, default="",
+                        help="Percorso del database SQLite (default: data/offerte.db)")
+    parser.add_argument("--no-llm", action="store_true",
+                        help="Durante --popola-db, salta del tutto l'estrazione delle feature (booleani a 0)")
+    parser.add_argument("--batch-size", type=int, default=50,
+                        help="Numero di offerte per chiamata LLM durante --popola-db (default: 50, auto 10 per Ollama). "
+                             "Usato solo con --no-rule-based.")
+    parser.add_argument("--llm-provider", default="auto",
+                        choices=["auto", "zenmux", "openrouter", "ollama"],
+                        help="Provider LLM per estrazione feature (default: auto). Usato solo con --no-rule-based.")
+    parser.add_argument("--llm-model", type=str, default="",
+                        help="Modello LLM da usare (default: quello del provider). Usato solo con --no-rule-based.")
+    parser.add_argument("--llm-base-url", type=str, default="",
+                        help="Base URL custom per il provider LLM (es. http://localhost:11434). Usato solo con --no-rule-based.")
+    parser.add_argument("--no-rule-based", action="store_true",
+                        help="Durante --popola-db, forza l'estrazione di tutte le feature con LLM "
+                             "saltando l'euristica rule-based. ATTENZIONE: con LLM locali (Ollama) "
+                             "i tempi sono molto lunghi (~15-20s/offerta su Gemma 3 12B Q8_0).")
     return parser
 
 
 def parse_args() -> Dict[str, Any]:
     parser = build_parser()
     args = parser.parse_args()
+
+    pun = args.pun
+    if pun is None:
+        env_pun = os.environ.get("PUN_MANUALE", "").strip()
+        if env_pun:
+            try:
+                pun = float(env_pun.replace(",", "."))
+            except ValueError:
+                print(f"⚠️  PUN_MANUALE non valido: {env_pun!r}")
+
+    psv = args.psv
+    if psv is None:
+        env_psv = os.environ.get("PSV_MANUALE", "").strip()
+        if env_psv:
+            try:
+                psv = float(env_psv.replace(",", "."))
+            except ValueError:
+                print(f"⚠️  PSV_MANUALE non valido: {env_psv!r}")
 
     config = {
         "commodity": args.commodity,
@@ -169,10 +220,13 @@ def parse_args() -> Dict[str, Any]:
         "potenza": args.potenza,
         "tipo_tariffa": args.tipo_tariffa,
         "tipo_offerta": args.tipo_offerta,
-        "pun": args.pun,
+        "pun": pun,
+        "psv": psv,
         "exclude_condizioni": [k.strip() for k in args.escludi_parole.split(",") if k.strip()],
         "solo_semplici": args.senza_vincoli,
         "no_oneri_recesso": args.no_oneri_recesso,
+        "penale_mese_max": args.penale_mese_max,
+        "penale_12m_max": args.penale_12m_max,
         "venditori": [v.strip() for v in args.filtra_venditori.split(",") if v.strip()],
         "download": args.aggiorna_dati,
         "output": args.output,
@@ -182,9 +236,22 @@ def parse_args() -> Dict[str, Any]:
         "confronta": args.confronto_mia_offerta,
         "max": args.max,
         "ignora_sconti_promo": args.ignora_sconti_promo,
+        "sconti_condizionati": args.sconti_condizionati,
         "zona": args.regione,
         "verifica": args.verifica,
+        "popola_db": args.popola_db,
+        "db_path": args.db_path,
+        "no_llm": args.no_llm,
+        "batch_size": args.batch_size,
+        "llm_provider": args.llm_provider,
+        "llm_model": args.llm_model,
+        "llm_base_url": args.llm_base_url,
+        "no_rule_based": args.no_rule_based,
     }
+
+    # Se richiesto popolamento DB, salta la modalità interattiva
+    if config["popola_db"]:
+        return config
 
     # Se mancano dati essenziali, entra in modalità interattiva
     dati_mancanti = (
@@ -246,7 +313,7 @@ def _modalita_interattiva(config: Dict[str, Any]) -> Dict[str, Any]:
         config["residente"] = _input_yesno("L'utenza è per la residenza principale (prima casa)?", default=True)
         config["non_residente"] = not config["residente"]
 
-    if config["potenza"] == 3.0:
+    if config["potenza"] == 3.0 and config["commodity"] != "gas":
         val = input(f"Potenza impegnata in kW [3]: ").strip()
         if val:
             try:
@@ -254,7 +321,15 @@ def _modalita_interattiva(config: Dict[str, Any]) -> Dict[str, Any]:
             except ValueError:
                 pass
 
-    if config["pun"] is None:
+    if config["commodity"] == "gas":
+        if config["psv"] is None:
+            val = input("Valore PSV in €/Smc (lascia vuoto per ultimo mensile): ").strip()
+            if val:
+                try:
+                    config["psv"] = float(val.replace(",", "."))
+                except ValueError:
+                    pass
+    elif config["pun"] is None:
         val = input("Valore PUN in €/kWh (lascia vuoto per ultimo mensile): ").strip()
         if val:
             try:
